@@ -19,10 +19,17 @@
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
-      }
+      },
+      "package": "com.mmustafa_kapici.ilacabak"
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "91151308-025b-421a-b517-aedff4e1bf4c"
+      }
+    },
+    "owner": "mmustafa_kapici"
   }
 }

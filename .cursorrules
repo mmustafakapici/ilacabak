@@ -1,0 +1,222 @@
+# **Yaşlılar İçin İlaç Takip Uygulaması - Tanım ve Özellikler**
+
+## **1. Uygulama Amacı**
+Yaşlı kullanıcıların ilaç saatlerini unutmamaları için hatırlatma sistemi sağlayan, kullanım kolaylığına odaklanan bir mobil uygulama. Kullanıcılar, ilaçlarını düzenli olarak takip edebilir, dozaj ve saat bilgilerini kaydedebilir ve hatırlatıcılar alabilirler.
+
+## **2. Hedef Kullanıcı Kitlesi**
+- Yaşlı bireyler (özellikle teknolojiye alışkın olmayanlar)
+- Kronik hastalığı olan bireyler
+- Yaşlı yakınları ve bakım veren kişiler
+
+## **3. Temel Özellikler**
+- **İlaç Hatırlatma Sistemi:** Belirlenen saatlerde bildirim/alarm ile ilaç hatırlatma.
+- **Kolay Kullanım Arayüzü:** Büyük butonlar, okunaklı fontlar ve basit navigasyon.
+- **Sesli Bildirim ve Sesli Komutlar:** Kullanıcı sesli hatırlatma alabilir ve sesli komutlarla ilaç ekleyebilir.
+- **Yakınlara Bildirim:** Kullanıcı ilaç almadığında yakınlarına uyarı gönderme.
+- **Günlük ve Haftalık Takvim:** Kullanıcının ilaç programını takip etmesi için bir görselleştirme aracı.
+- **Offline Çalışma:** İnternet bağlantısı olmadan da temel fonksiyonlar çalışabilir.
+
+---
+
+## **4. Ekranlar ve Fonksiyonları**
+
+### **4.1. Ana Ekran (Dashboard)**
+- Kullanıcının **o günkü ilaç programı** özet halinde görüntülenir.
+- **En yakın ilaç hatırlatması** kaç dakika kaldığı ile gösterilir.
+- Son alınan ilaç bilgisi gösterilir.
+- **Hızlı erişim butonları:** “İlaç Ekle”, “İlaçlarım”, “Hatırlatmalar” gibi ana işlevlere ulaşım sağlanır.
+
+### **4.2. İlaç Ekleme Ekranı**
+- **İlaç Adı:** Kullanıcı ilacın ismini girer.
+- **Dozaj Bilgisi:** mg/ml veya tablet/adet cinsinden dozaj belirleme.
+- **Kullanım Sıklığı:** Günlük, haftalık veya belirli günlerde ilaç kullanım seçeneği.
+- **Saat Seçimi:** Kullanıcı bir veya birden fazla saat belirleyebilir.
+- **Hatırlatma Türü:** Bildirim, alarm veya titreşim tercihi.
+- **İlaç Fotoğrafı Ekleme (Opsiyonel)**
+- **Notlar:** Özel kullanım bilgileri eklenebilir.
+
+### **4.3. Aktif Kullanılan İlaçlar Ekranı**
+- Kullanıcının **şu an kullandığı ilaçlar** listelenir.
+- Kullanıcı ilaçları düzenleyebilir veya silebilir.
+- **İlaç kullanım durumu:** Devam ediyor/Bitti olarak işaretlenebilir.
+
+### **4.4. Günlük ve Yaklaşan İlaçlar Ekranı**
+- **Bugün Kullanılacak İlaçlar:** O gün içindeki ilaçlar bir tablo halinde gösterilir.
+- **Yaklaşan İlaç Saatleri:** Önümüzdeki birkaç saatte alınması gereken ilaçlar listelenir.
+- Kullanıcı **“İlaç Alındı”** butonuna basarak alım durumunu işaretleyebilir.
+
+### **4.5. Bildirim ve Hatırlatma Ekranı**
+- **Alınmayan ilaç uyarısı:** Kullanıcı ilacı almazsa bir uyarı mesajı görüntülenir.
+- **Yakınlara bildirim gönderme:** Kullanıcı belirlenen kişilere bildirim ile bilgi verebilir.
+- **Sesli Hatırlatma Ayarları:** Sesli bildirim, görsel uyarı veya titreşim tercihi yapılabilir.
+
+### **4.6. Ayarlar ve Kullanıcı Profili Ekranı**
+- **Kullanıcı Bilgileri:** Kullanıcının adı, yaş bilgisi ve sağlık durumu.
+- **Bildirim Tercihleri:** Sesli, titreşimli veya görsel bildirim ayarları.
+- **Yakın Kişiler:** Acil durumda bildirim gönderilecek kişilerin listesi.
+- **Dil ve Tema Ayarları:** Büyük font, yüksek kontrast gibi erişilebilirlik seçenekleri.
+
+### **4.7. Geçmiş Kullanım ve Raporlar Ekranı (Opsiyonel)**
+- **İlaç Kullanım Geçmişi:** Kullanıcının önceki günlerde aldığı ilaçlar listelenir.
+- **Raporlar:** Kullanıcının ilaçları düzenli alıp almadığını gösteren grafikler.
+
+---
+
+## **5. Tasarım Prensipleri**
+
+### **5.1. Kullanıcı Dostu Arayüz**
+- **Büyük Fontlar ve Butonlar:** Yaşlı kullanıcıların rahatça okuyabilmesi için büyük metin ve butonlar.
+- **Basit Navigasyon:** Karmaşık menülerden kaçınılmalı, ana ekran üzerinden temel işlevlere ulaşılabilmeli.
+- **Yüksek Kontrastlı Tema:** Görme güçlüğü çekenler için siyah-beyaz veya sarı-mavi gibi yüksek kontrastlı renk temaları desteklenmeli.
+- **Sesli Destek:** Kullanıcılar için sesli geri bildirim ve komutlarla kullanım kolaylığı sağlanmalı.
+
+### **5.2. Güçlü Hatırlatma Mekanizması**
+- **Titreşimli ve Sesli Bildirimler:** Kullanıcıya ilacını unutturmamak için farklı hatırlatma seçenekleri.
+- **Yakınlara Bildirim:** Kullanıcı belirlenen ilaç saatinde ilaç almazsa bir yakınını haberdar etme.
+- **Alarm Erteleme:** Kullanıcı ilaç alımını kısa bir süre erteleyebilmelidir.
+
+---
+
+## **6. Teknik Gereksinimler**
+- **Platform:** Android ve iOS için mobil uygulama.
+- **Veri Depolama:** SQLite veritabanı kullanılarak lokal depolama sağlanacaktır.
+- **Offline Mod:** İnternet bağlantısı olmasa bile ilaç hatırlatmaları çalışmalı.
+- **Bildirimler:** Push notification, sesli alarm ve titreşim desteği.
+- **Veritabanı Yapısı:**
+  - `ilaclar` tablosu: `id`, `ad`, `dozaj`, `saatler`, `kullanım_sıklığı`, `bildirim_türü`.
+  - `hatirlatmalar` tablosu: `id`, `ilac_id`, `zaman`, `durum`.
+  - `kullanici` tablosu: `id`, `isim`, `bildirim_tercihleri`, `yakın_kisiler`.
+
+---
+
+## **7. Özet ve Sonuç**
+Bu uygulama, yaşlı bireylerin ilaçlarını zamanında almasını sağlarken, aynı zamanda onların teknolojiyi kolayca kullanabilmesini hedeflemektedir. SQLite kullanımı sayesinde lokal veri saklama sağlanarak internet bağlantısına bağımlı olunmadan ilaç takip süreci yönetilecektir. Basit arayüzü, sesli bildirimleri ve otomatik hatırlatma sistemleri ile günlük ilaç takibini kolaylaştıracaktır. Geliştirme aşamasında, kullanıcı testleri yapılarak erişilebilirlik ve kullanım kolaylığı en üst düzeye çıkarılmalıdır.
+
+Size bu ilaç takip uygulaması için bir UI guideline yazacağım. Türkçe olarak hazırlayacağım.
+
+# İlaç Takip Uygulaması - UI Tasarım Kılavuzu
+
+## 1. Renk Paleti
+
+### Ana Renkler
+- **Birincil Renk:** #2196F3 (Açık Mavi)
+  - Kullanım: Ana butonlar, önemli başlıklar
+- **İkincil Renk:** #4CAF50 (Yeşil)
+  - Kullanım: Onay butonları, pozitif aksiyonlar
+- **Uyarı Rengi:** #FF5722 (Turuncu)
+  - Kullanım: Hatırlatmalar, önemli bildirimler
+- **Hata Rengi:** #F44336 (Kırmızı)
+  - Kullanım: Hata mesajları, kritik uyarılar
+
+### Arka Plan Renkleri
+- **Ana Arka Plan:** #FFFFFF (Beyaz)
+- **İkincil Arka Plan:** #F5F5F5 (Açık Gri)
+- **Kart Arka Plan:** #FFFFFF (Beyaz)
+
+## 2. Tipografi
+
+### Font Ailesi
+- **Ana Font:** Roboto
+- **Alternatif Font:** Arial
+
+### Font Boyutları
+- **Başlık 1:** 32px (2rem)
+- **Başlık 2:** 28px (1.75rem)
+- **Başlık 3:** 24px (1.5rem)
+- **Normal Metin:** 20px (1.25rem)
+- **Küçük Metin:** 16px (1rem)
+
+### Font Ağırlıkları
+- Başlıklar: 600 (Semi-Bold)
+- Normal Metin: 400 (Regular)
+- Vurgulanan Metin: 500 (Medium)
+
+## 3. Butonlar
+
+### Boyutlar
+- **Büyük Buton:** 64px yükseklik
+- **Normal Buton:** 56px yükseklik
+- **Minimum Dokunma Alanı:** 48x48px
+
+### Stil
+- Köşe Yuvarlaklığı: 12px
+- İç Padding: 16px
+- Buton İçi Metin Boyutu: 20px
+
+## 4. Boşluklar ve Hizalama
+
+### Kenar Boşlukları
+- Sayfa Kenar Boşluğu: 24px
+- Elementler Arası Dikey Boşluk: 16px
+- Kartlar Arası Boşluk: 16px
+
+### Grid Sistemi
+- 12 kolonlu grid sistemi
+- Kolon Arası Boşluk: 16px
+
+## 5. Kartlar ve Containerlar
+
+### Kart Tasarımı
+- Köşe Yuvarlaklığı: 16px
+- Gölge: 0 2px 4px rgba(0,0,0,0.1)
+- İç Padding: 20px
+
+## 6. İkonlar
+
+### Boyutlar
+- **Büyük İkon:** 32x32px
+- **Normal İkon:** 24x24px
+- **Küçük İkon:** 20x20px
+
+### Stil
+- Çizgi Kalınlığı: 2px
+- Renk: Metin rengiyle uyumlu
+
+## 7. Erişilebilirlik Özellikleri
+
+### Kontrast Oranları
+- Metin/Arka plan minimum kontrast oranı: 4.5:1
+- Büyük metin minimum kontrast oranı: 3:1
+
+### Dokunma Hedefleri
+- Minimum dokunma alanı: 48x48px
+- Dokunma hedefleri arası minimum boşluk: 8px
+
+## 8. Bildirim ve Dialog Kutuları
+
+### Bildirim Kartları
+- Yükseklik: 72px
+- Köşe Yuvarlaklığı: 12px
+- İkon Boyutu: 24x24px
+
+### Dialog Kutuları
+- Maksimum Genişlik: 400px
+- Minimum Genişlik: 280px
+- İç Padding: 24px
+
+## 9. Form Elemanları
+
+### Metin Girişi
+- Yükseklik: 56px
+- Köşe Yuvarlaklığı: 8px
+- Placeholder Metin Boyutu: 18px
+- Aktif Durum Çerçeve Kalınlığı: 2px
+
+### Seçim Kutuları
+- Checkbox Boyutu: 24x24px
+- Radio Button Boyutu: 24x24px
+- Switch Genişlik: 52px
+
+## 10. Animasyonlar
+
+### Geçiş Süreleri
+- Hızlı Geçiş: 150ms
+- Normal Geçiş: 300ms
+- Yavaş Geçiş: 500ms
+
+### Easing Functions
+- Standard Easing: cubic-bezier(0.4, 0, 0.2, 1)
+- Giriş Easing: cubic-bezier(0.0, 0, 0.2, 1)
+- Çıkış Easing: cubic-bezier(0.4, 0, 1, 1)
+
+Bu tasarım kılavuzu, yaşlı kullanıcıların rahatça kullanabileceği, görsel açıdan net ve tutarlı bir arayüz oluşturmayı hedeflemektedir. Tüm ölçüler ve değerler, erişilebilirlik standartlarına uygun olarak belirlenmiştir.
