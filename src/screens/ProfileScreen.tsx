@@ -37,7 +37,7 @@ type ProfileScreenNavigationProp = NativeStackNavigationProp<
 
 type ThemeMode = "light" | "dark" | "auto";
 
-export const ProfileScreen = () => {
+const ProfileScreen = () => {
   const navigation = useNavigation<ProfileScreenNavigationProp>();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [settings, setSettings] = useState<Settings | null>({
@@ -638,6 +638,8 @@ export const ProfileScreen = () => {
     </ScrollView>
   );
 };
+
+export default ProfileScreen;
 
 const styles = StyleSheet.create({
   container: {

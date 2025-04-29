@@ -1,123 +1,104 @@
-import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
-import { MaterialCommunityIcons } from "@expo/vector-icons";
+import React from "react";
+import { createBottomTabNavigator } from "@react-navigation/bottom-tab-navigator";
+import { MaterialIcons } from "@expo/vector-icons";
+import { View, Text, StyleSheet } from "react-native";
 
 import { HomeScreen } from "../screens/HomeScreen";
 import { MedicinesScreen } from "../screens/MedicinesScreen";
-import { RemindersScreen } from "../screens/RemindersScreen";
-import { DailyMedicineScreen } from "../screens/CalendarScreen";
+import { DailyMedicineScreen } from "../screens/DailyMedicineScreen";
+import { CalendarScreen } from "../screens/CalendarScreen";
 import { ProfileScreen } from "../screens/ProfileScreen";
 
 const Tab = createBottomTabNavigator();
 
-export const BottomTabNavigator = () => {
+const BottomTabNavigator = () => {
   return (
     <Tab.Navigator
       screenOptions={{
+        tabBarActiveTintColor: "#2196F3",
+        tabBarInactiveTintColor: "#757575",
         tabBarStyle: {
-          height: 85,
-          paddingBottom: 16,
-          paddingTop: 12,
-          backgroundColor: "white",
-          borderTopWidth: 1,
-          borderTopColor: "#E0E0E0",
-          elevation: 8,
-          shadowColor: "#000",
-          shadowOffset: {
-            width: 0,
-            height: -2,
-          },
-          shadowOpacity: 0.1,
-          shadowRadius: 4,
+          height: 60,
+          paddingBottom: 8,
+          paddingTop: 8,
         },
         tabBarLabelStyle: {
-          fontSize: 14,
-          fontWeight: "600",
-          marginTop: 6,
-        },
-        tabBarIconStyle: {
-          marginTop: 6,
-        },
-        tabBarActiveTintColor: "#2196F3",
-        tabBarInactiveTintColor: "#9E9E9E",
-        headerShown: true,
-        headerStyle: {
-          height: 70,
-          backgroundColor: "white",
-          elevation: 2,
-          shadowColor: "#000",
-          shadowOffset: {
-            width: 0,
-            height: 2,
-          },
-          shadowOpacity: 0.1,
-          shadowRadius: 3,
-        },
-        headerTitleStyle: {
-          fontSize: 22,
-          fontWeight: "600",
-          color: "#212121",
+          fontSize: 12,
         },
       }}
     >
       <Tab.Screen
-        name="AnaSayfa"
+        name="HomeScreen"
         component={HomeScreen}
         options={{
-          tabBarLabel: "Ana Sayfa",
-          headerTitle: "Günlük Program",
+          title: "Ana Sayfa",
           tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="home" color={color} size={32} />
+            <MaterialIcons name="home" size={size} color={color} />
           ),
         }}
       />
       <Tab.Screen
-        name="Ilaclarim"
+        name="MedicinesScreen"
         component={MedicinesScreen}
         options={{
-          tabBarLabel: "İlaçlarım",
-          headerTitle: "İlaçlarım",
+          title: "İlaçlarım",
           tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="pill" color={color} size={32} />
+            <MaterialIcons name="medication" size={size} color={color} />
           ),
         }}
       />
       <Tab.Screen
-        name="Hatirlatmalar"
-        component={RemindersScreen}
-        options={{
-          tabBarLabel: "Hatırlatmalar",
-          headerTitle: "Hatırlatmalar",
-          tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="bell" color={color} size={32} />
-          ),
-        }}
-      />
-      <Tab.Screen
-        name="GunlukProgram"
+        name="DailyMedicineScreen"
         component={DailyMedicineScreen}
         options={{
-          tabBarLabel: "Program",
-          headerTitle: "Günlük İlaç Programı",
+          title: "Günlük Dozlar",
           tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons
-              name="calendar-today"
-              color={color}
-              size={32}
-            />
+            <MaterialIcons name="schedule" size={size} color={color} />
           ),
         }}
       />
       <Tab.Screen
-        name="Profil"
+        name="CalendarScreen"
+        component={CalendarScreen}
+        options={{
+          title: "Takvim",
+          tabBarIcon: ({ color, size }) => (
+            <MaterialIcons name="calendar-today" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="ProfileScreen"
         component={ProfileScreen}
         options={{
-          tabBarLabel: "Profil",
-          headerTitle: "Profil",
+          title: "Profil",
           tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="account" color={color} size={32} />
+            <MaterialIcons name="person" size={size} color={color} />
           ),
         }}
       />
     </Tab.Navigator>
   );
 };
+
+export default BottomTabNavigator;
+
+const styles = StyleSheet.create({
+  badge: {
+    position: "absolute",
+    right: -8,
+    top: -8,
+    backgroundColor: "#FF5722",
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 4,
+  },
+  badgeText: {
+    color: "white",
+    fontSize: 12,
+    fontWeight: "bold",
+  },
+});

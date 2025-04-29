@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useContext } from "react";
 import {
   View,
   Text,
@@ -16,125 +16,131 @@ import {
 import { MaterialIcons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import { StorageService } from "../services/storage";
-import { OCRService } from "../services/OCRService";
 import * as ImagePicker from "expo-image-picker";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { RootStackParamList } from "../types/navigation";
+import { Medicine } from "../types/medicine";
+import { ImgToMedicineService } from "../services/ImgToMedicineService";
+import { UsageService } from "../services/UsageService";
+import { MedicineUsage } from "../types/usage";
+import { MedicineContext } from "../context/MedicineContext";
+import { Picker } from "@react-native-picker/picker";
+import DateTimePicker from "@react-native-community/datetimepicker";
+import { useMedicine } from "../context/MedicineContext";
+
+console.log("💊 İlaç ekleme ekranı yükleniyor...");
 
 type AddMedicineScreenNavigationProp = NativeStackNavigationProp<
   RootStackParamList,
   "AddMedicine"
 >;
 
-const MEDICINE_TYPES = [
-  "Tablet",
-  "Kapsül",
-  "Şurup",
-  "İğne",
-  "İnhaler",
-  "Merhem",
-  "Damla",
-];
-
-const USAGE_TYPES = [
-  "Aç karnına",
-  "Tok karnına",
-  "Yemeklerle birlikte",
-  "Herhangi bir zamanda",
+const TIME_OPTIONS = [
+  { label: "Sabah", value: "08:00" },
+  { label: "Öğle", value: "12:00" },
+  { label: "Akşam", value: "18:00" },
+  { label: "Gece", value: "22:00" },
 ];
 
 const FREQUENCY_OPTIONS = [
-  { id: "daily", label: "Her Gün", icon: "today" as const },
-  { id: "weekly", label: "Haftalık", icon: "date-range" as const },
-  { id: "monthly", label: "Aylık", icon: "calendar-month" as const },
-  { id: "custom", label: "Özel", icon: "edit-calendar" as const },
+  { label: "Günlük", value: "GÜNLÜK" },
+  { label: "Haftalık", value: "HAFTALIK" },
+  { label: "Aylık", value: "AYLIK" },
+  { label: "Özel", value: "ÖZEL" },
 ];
 
-const WEEK_DAYS = [
-  { id: 0, label: "Pazar", short: "Paz" },
-  { id: 1, label: "Pazartesi", short: "Pzt" },
-  { id: 2, label: "Salı", short: "Sal" },
-  { id: 3, label: "Çarşamba", short: "Çar" },
-  { id: 4, label: "Perşembe", short: "Per" },
-  { id: 5, label: "Cuma", short: "Cum" },
-  { id: 6, label: "Cumartesi", short: "Cmt" },
+const TYPE_OPTIONS = [
+  { label: "Tablet", value: "TABLET" },
+  { label: "Kapsül", value: "KAPSÜL" },
+  { label: "Şurup", value: "ŞURUP" },
+  { label: "İğne", value: "İĞNE" },
+  { label: "Ampul", value: "AMPUL" },
+  { label: "Damla", value: "DAMLA" },
+  { label: "Gargara", value: "GARGARA" },
 ];
 
-const TIMING_OPTIONS = [
-  { label: "15 dakika önce", value: "15 dakika önce" },
-  { label: "30 dakika önce", value: "30 dakika önce" },
-  { label: "1 saat önce", value: "1 saat önce" },
-  { label: "15 dakika sonra", value: "15 dakika sonra" },
-  { label: "30 dakika sonra", value: "30 dakika sonra" },
-  { label: "1 saat sonra", value: "1 saat sonra" },
+const UNIT_OPTIONS = [
+  { label: "MG", value: "MG" },
+  { label: "ML", value: "ML" },
+  { label: "MCG", value: "MCG" },
+  { label: "GR", value: "GR" },
 ];
 
-const STOCK_UNITS = [
-  { id: "tablet", label: "Tablet" },
-  { id: "kapsül", label: "Kapsül" },
-  { id: "ml", label: "ML" },
-  { id: "damla", label: "Damla" },
-  { id: "puf", label: "Puf" },
-  { id: "ampul", label: "Ampul" },
-  { id: "şurup", label: "Şurup" },
-];
-
-export const AddMedicineScreen = () => {
+const AddMedicineScreen = () => {
   const navigation = useNavigation<AddMedicineScreenNavigationProp>();
-  const [name, setName] = useState("");
-  const [dosage, setDosage] = useState("");
-  const [type, setType] = useState(MEDICINE_TYPES[0]);
-  const [usageType, setUsageType] = useState(USAGE_TYPES[0]);
-  const [frequency, setFrequency] = useState("daily");
-  const [time, setTime] = useState("");
-  const [showTimePicker, setShowTimePicker] = useState(false);
-  const [timingNote, setTimingNote] = useState("");
-  const [selectedDays, setSelectedDays] = useState<number[]>([]);
+  const { addMedicine } = useMedicine();
+  const [medicine, setMedicine] = useState<Medicine>({
+    id: Date.now().toString(),
+    name: "",
+    dosage: {
+      amount: 0,
+      unit: "MG",
+    },
+    type: "TABLET",
+    usage: {
+      frequency: "GÜNLÜK",
+      time: [],
+      condition: "",
+    },
+    schedule: {
+      startDate: new Date().toISOString().split("T")[0],
+      endDate: "",
+      reminders: [],
+    },
+    notes: "",
+    taken: false,
+  });
   const [showTypeModal, setShowTypeModal] = useState(false);
   const [showUsageModal, setShowUsageModal] = useState(false);
   const [showFrequencyModal, setShowFrequencyModal] = useState(false);
   const [showTimingModal, setShowTimingModal] = useState(false);
-  const [notes, setNotes] = useState("");
   const [image, setImage] = useState<string | null>(null);
-
-  // Stok bilgileri için state'ler
-  const [stockAmount, setStockAmount] = useState("");
-  const [stockUnit, setStockUnit] = useState(STOCK_UNITS[0].id);
-  const [stockThreshold, setStockThreshold] = useState("");
-  const [showStockUnitModal, setShowStockUnitModal] = useState(false);
-
   const [isProcessing, setIsProcessing] = useState(false);
   const [ocrText, setOcrText] = useState<string>("");
-  const [ocrResult, setOcrResult] = useState<any>(null);
+  const [showStartDatePicker, setShowStartDatePicker] = useState(false);
+  const [showEndDatePicker, setShowEndDatePicker] = useState(false);
+
+  console.log("📝 İlaç formu durumu:", {
+    isim: medicine.name,
+    tip: medicine.type,
+    dozaj: medicine.dosage,
+    kullanım: medicine.usage,
+  });
 
   const processImage = async (uri: string) => {
+    console.log("🖼️ Görüntü işleme başlatılıyor...");
+    console.log("📸 İşlenecek görüntü URI:", uri);
+
     try {
       setIsProcessing(true);
-      const result = await OCRService.processImage(uri);
-      setOcrText(result.text);
-      setOcrResult(result.medicineInfo);
+      console.log(
+        "🔍 ImgToMedicineService.processImageToMedicine çağrılıyor..."
+      );
+      const result = await ImgToMedicineService.processImageToMedicine(uri);
+      console.log("✅ Görüntü işleme sonucu:", JSON.stringify(result, null, 2));
 
-      // Otomatik form doldurma
-      if (result.medicineInfo) {
-        if (result.medicineInfo.name) setName(result.medicineInfo.name);
-        if (result.medicineInfo.dosage) setDosage(result.medicineInfo.dosage);
-        if (result.medicineInfo.type) setType(result.medicineInfo.type);
-        if (result.medicineInfo.usage) setUsageType(result.medicineInfo.usage);
-      }
+      setMedicine(result);
+      setOcrText(JSON.stringify(result, null, 2));
     } catch (error) {
+      console.error("❌ Görüntü işlenirken hata oluştu:", error);
       Alert.alert("Hata", "Görüntü işlenirken bir hata oluştu.");
     } finally {
       setIsProcessing(false);
+      console.log("🏁 Görüntü işleme tamamlandı");
     }
   };
 
   const pickImage = async () => {
+    console.log("📱 Galeriden görüntü seçme işlemi başlatılıyor...");
+
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== "granted") {
+      console.warn("⚠️ Galeri izni reddedildi");
       Alert.alert("İzin Gerekli", "Galeriye erişim izni gerekiyor.");
       return;
     }
 
+    console.log("🖼️ Galeri açılıyor...");
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
@@ -143,18 +149,25 @@ export const AddMedicineScreen = () => {
     });
 
     if (!result.canceled) {
+      console.log("✅ Görüntü seçildi:", result.assets[0].uri);
       setImage(result.assets[0].uri);
       await processImage(result.assets[0].uri);
+    } else {
+      console.log("❌ Görüntü seçme işlemi iptal edildi");
     }
   };
 
   const takePhoto = async () => {
+    console.log("📸 Kamera ile fotoğraf çekme işlemi başlatılıyor...");
+
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== "granted") {
+      console.warn("⚠️ Kamera izni reddedildi");
       Alert.alert("İzin Gerekli", "Kameraya erişim izni gerekiyor.");
       return;
     }
 
+    console.log("📷 Kamera açılıyor...");
     const result = await ImagePicker.launchCameraAsync({
       allowsEditing: true,
       aspect: [4, 3],
@@ -162,12 +175,16 @@ export const AddMedicineScreen = () => {
     });
 
     if (!result.canceled) {
+      console.log("✅ Fotoğraf çekildi:", result.assets[0].uri);
       setImage(result.assets[0].uri);
       await processImage(result.assets[0].uri);
+    } else {
+      console.log("❌ Fotoğraf çekme işlemi iptal edildi");
     }
   };
 
   const showImagePickerOptions = () => {
+    console.log("🖼️ Görüntü seçme seçenekleri gösteriliyor...");
     Alert.alert(
       "İlaç Görüntüsü Ekle",
       "Nasıl bir görüntü eklemek istersiniz?",
@@ -183,57 +200,36 @@ export const AddMedicineScreen = () => {
         {
           text: "İptal",
           style: "cancel",
+          onPress: () => console.log("❌ Görüntü seçme işlemi iptal edildi"),
         },
       ]
     );
   };
 
-  const handleSave = async () => {
-    if (!name || !dosage || !stockAmount || !stockThreshold) {
-      Alert.alert("Hata", "Lütfen tüm zorunlu alanları doldurunuz.");
+  const handleSave = () => {
+    console.log("💾 İlaç kaydetme işlemi başlatılıyor...");
+    if (!medicine.name || medicine.usage.time.length === 0) {
+      console.warn("⚠️ Eksik bilgi: İlaç adı veya kullanım zamanları");
+      Alert.alert("Hata", "Lütfen ilaç adı ve kullanım zamanlarını belirtin");
       return;
     }
 
-    try {
-      const updatedMedicine = {
-        id: Date.now().toString(),
-        name,
-        dosage,
-        type,
-        usageType,
-        frequency,
-        time,
-        timingNote,
-        selectedDays,
-        notes,
-        taken: false,
-        // Stok bilgileri
-        stockAmount: parseInt(stockAmount),
-        stockUnit,
-        stockThreshold: parseInt(stockThreshold),
-        stockLastUpdated: new Date().toISOString().split("T")[0],
-        image,
-      };
+    console.log("📝 İlaç bilgileri kontrol ediliyor...");
+    const medicineToSave = {
+      ...medicine,
+      dosage:
+        medicine.dosage.amount > 0
+          ? medicine.dosage
+          : {
+              amount: 0,
+              unit: "MG",
+            },
+    };
 
-      await StorageService.addMedicine(updatedMedicine);
-      Alert.alert("Başarılı", "İlaç başarıyla eklendi.", [
-        {
-          text: "Tamam",
-          onPress: () => navigation.goBack(),
-        },
-      ]);
-    } catch (error) {
-      console.error("İlaç kaydedilirken hata oluştu:", error);
-      Alert.alert("Hata", "İlaç eklenirken bir hata oluştu.");
-    }
-  };
-
-  const toggleDay = (dayId: number) => {
-    setSelectedDays((prev) =>
-      prev.includes(dayId)
-        ? prev.filter((id) => id !== dayId)
-        : [...prev, dayId]
-    );
+    console.log("✅ İlaç kaydediliyor:", medicineToSave);
+    addMedicine(medicineToSave);
+    console.log("🏁 İlaç kaydedildi, ana ekrana dönülüyor");
+    navigation.goBack();
   };
 
   const renderHelpText = (text: string) => (
@@ -245,37 +241,62 @@ export const AddMedicineScreen = () => {
     title: string,
     children: React.ReactNode,
     onClose: () => void
-  ) => (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="slide"
-      onRequestClose={onClose}
-    >
-      <View style={styles.modalOverlay}>
-        <View style={styles.modalContent}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>{title}</Text>
-            <TouchableOpacity onPress={onClose}>
-              <MaterialIcons name="close" size={24} color="#757575" />
-            </TouchableOpacity>
+  ) => {
+    console.log(`📱 Modal gösteriliyor: ${title}`);
+    return (
+      <Modal
+        visible={visible}
+        transparent
+        animationType="slide"
+        onRequestClose={onClose}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>{title}</Text>
+              <TouchableOpacity onPress={onClose}>
+                <MaterialIcons name="close" size={24} color="#757575" />
+              </TouchableOpacity>
+            </View>
+            {children}
           </View>
-          {children}
         </View>
-      </View>
-    </Modal>
-  );
+      </Modal>
+    );
+  };
 
-  const handleTimeSelect = (selectedTime: Date | null) => {
-    setShowTimePicker(false);
-    if (selectedTime) {
-      setTime(
-        selectedTime.toLocaleTimeString("tr-TR", {
-          hour: "2-digit",
-          minute: "2-digit",
-        })
-      );
+  const handleTimeSelect = (time: string) => {
+    console.log("⏰ Zaman seçimi yapılıyor:", time);
+    if (medicine.usage.time.includes(time)) {
+      console.log("❌ Zaman zaten seçili, kaldırılıyor");
+      setMedicine({
+        ...medicine,
+        usage: {
+          ...medicine.usage,
+          time: medicine.usage.time.filter((t) => t !== time),
+        },
+      });
+    } else {
+      console.log("✅ Yeni zaman eklendi");
+      setMedicine({
+        ...medicine,
+        usage: {
+          ...medicine.usage,
+          time: [...medicine.usage.time, time],
+        },
+      });
     }
+  };
+
+  const handleTypeChange = (value: string) => {
+    setMedicine({ ...medicine, type: value });
+  };
+
+  const handleFrequencyChange = (value: string) => {
+    setMedicine({
+      ...medicine,
+      usage: { ...medicine.usage, frequency: value },
+    });
   };
 
   return (
@@ -303,29 +324,6 @@ export const AddMedicineScreen = () => {
         <View style={styles.ocrResultContainer}>
           <Text style={styles.ocrResultTitle}>OCR Sonucu:</Text>
           <Text style={styles.ocrResultText}>{ocrText}</Text>
-          {ocrResult && (
-            <View style={styles.ocrInfoContainer}>
-              <Text style={styles.ocrInfoTitle}>Tespit Edilen Bilgiler:</Text>
-              {ocrResult.name && (
-                <Text style={styles.ocrInfoText}>
-                  İlaç Adı: {ocrResult.name}
-                </Text>
-              )}
-              {ocrResult.dosage && (
-                <Text style={styles.ocrInfoText}>
-                  Dozaj: {ocrResult.dosage}
-                </Text>
-              )}
-              {ocrResult.type && (
-                <Text style={styles.ocrInfoText}>Tip: {ocrResult.type}</Text>
-              )}
-              {ocrResult.usage && (
-                <Text style={styles.ocrInfoText}>
-                  Kullanım: {ocrResult.usage}
-                </Text>
-              )}
-            </View>
-          )}
         </View>
       )}
 
@@ -334,122 +332,169 @@ export const AddMedicineScreen = () => {
         {renderHelpText("İlacın tam adını yazınız")}
         <TextInput
           style={styles.input}
-          value={name}
-          onChangeText={setName}
+          value={medicine.name}
+          onChangeText={(text) => setMedicine({ ...medicine, name: text })}
           placeholder="Örn: Aspirin"
           placeholderTextColor="#757575"
         />
       </View>
 
       <View style={styles.formGroup}>
-        <Text style={styles.label}>Dozaj</Text>
+        <Text style={styles.label}>Dozaj (Opsiyonel)</Text>
         {renderHelpText("İlacın dozaj miktarını yazınız")}
-        <TextInput
-          style={styles.input}
-          value={dosage}
-          onChangeText={setDosage}
-          placeholder="Örn: 1 tablet"
-          placeholderTextColor="#757575"
-        />
+        <View style={styles.dosageContainer}>
+          <TextInput
+            style={[styles.input, styles.dosageInput]}
+            value={medicine.dosage.amount.toString()}
+            onChangeText={(text) =>
+              setMedicine({
+                ...medicine,
+                dosage: { ...medicine.dosage, amount: parseFloat(text) || 0 },
+              })
+            }
+            keyboardType="numeric"
+            placeholder="Miktar"
+            placeholderTextColor="#757575"
+          />
+          <TouchableOpacity
+            style={styles.unitButton}
+            onPress={() => setShowTypeModal(true)}
+          >
+            <Text style={styles.unitButtonText}>{medicine.dosage.unit}</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <View style={styles.formGroup}>
         <Text style={styles.label}>İlaç Tipi</Text>
         {renderHelpText("İlacın kullanım şeklini seçiniz")}
-        <TouchableOpacity
-          style={styles.selectButton}
-          onPress={() => setShowTypeModal(true)}
+        <Picker
+          selectedValue={medicine.type}
+          style={styles.picker}
+          onValueChange={handleTypeChange}
         >
-          <MaterialIcons name="medication" size={28} color="#2196F3" />
-          <Text style={styles.selectButtonText}>{type}</Text>
-        </TouchableOpacity>
-      </View>
-
-      <View style={styles.formGroup}>
-        <Text style={styles.label}>Kullanım Şekli</Text>
-        {renderHelpText("İlacı nasıl kullanacağınızı seçiniz")}
-        <TouchableOpacity
-          style={styles.selectButton}
-          onPress={() => setShowUsageModal(true)}
-        >
-          <MaterialIcons name="restaurant" size={28} color="#2196F3" />
-          <Text style={styles.selectButtonText}>{usageType}</Text>
-        </TouchableOpacity>
+          {TYPE_OPTIONS.map((option) => (
+            <Picker.Item
+              key={option.value}
+              label={option.label}
+              value={option.value}
+            />
+          ))}
+        </Picker>
       </View>
 
       <View style={styles.formGroup}>
         <Text style={styles.label}>Kullanım Sıklığı</Text>
         {renderHelpText("İlacı ne sıklıkta kullanacağınızı seçiniz")}
-        <TouchableOpacity
-          style={styles.selectButton}
-          onPress={() => setShowFrequencyModal(true)}
+        <Picker
+          selectedValue={medicine.usage.frequency}
+          style={styles.picker}
+          onValueChange={handleFrequencyChange}
         >
-          <MaterialIcons
-            name={
-              FREQUENCY_OPTIONS.find((f) => f.id === frequency)?.icon || "today"
-            }
-            size={28}
-            color="#2196F3"
-          />
-          <Text style={styles.selectButtonText}>
-            {FREQUENCY_OPTIONS.find((f) => f.id === frequency)?.label}
-          </Text>
-        </TouchableOpacity>
+          {FREQUENCY_OPTIONS.map((option) => (
+            <Picker.Item
+              key={option.value}
+              label={option.label}
+              value={option.value}
+            />
+          ))}
+        </Picker>
       </View>
 
-      {frequency === "weekly" && (
-        <View style={styles.formGroup}>
-          <Text style={styles.label}>Günler</Text>
-          {renderHelpText("İlacı hangi günlerde alacağınızı seçiniz")}
-          <View style={styles.daysContainer}>
-            {WEEK_DAYS.map((day) => (
-              <TouchableOpacity
-                key={day.id}
+      <View style={styles.formGroup}>
+        <Text style={styles.label}>Kullanım Zamanları</Text>
+        {renderHelpText("İlacı hangi saatlerde almanız gerektiğini seçiniz")}
+        <View style={styles.timeContainer}>
+          {TIME_OPTIONS.map((option) => (
+            <TouchableOpacity
+              key={option.value}
+              style={[
+                styles.timeButton,
+                medicine.usage.time.includes(option.value) &&
+                  styles.timeButtonSelected,
+              ]}
+              onPress={() => handleTimeSelect(option.value)}
+            >
+              <Text
                 style={[
-                  styles.dayButton,
-                  selectedDays.includes(day.id) && styles.dayButtonSelected,
+                  styles.timeButtonText,
+                  medicine.usage.time.includes(option.value) &&
+                    styles.timeButtonTextSelected,
                 ]}
-                onPress={() => toggleDay(day.id)}
               >
-                <Text
-                  style={[
-                    styles.dayButtonText,
-                    selectedDays.includes(day.id) &&
-                      styles.dayButtonTextSelected,
-                  ]}
-                >
-                  {day.short}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+                {option.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
         </View>
-      )}
-
-      <View style={styles.formGroup}>
-        <Text style={styles.label}>Kullanım Zamanı</Text>
-        {renderHelpText("İlacı hangi saatte almanız gerektiğini seçiniz")}
-        <TouchableOpacity
-          style={styles.selectButton}
-          onPress={() => setShowTimePicker(true)}
-        >
-          <MaterialIcons name="access-time" size={28} color="#2196F3" />
-          <Text style={styles.selectButtonText}>{time || "Saat Seçin"}</Text>
-        </TouchableOpacity>
       </View>
 
       <View style={styles.formGroup}>
-        <Text style={styles.label}>Zamanlama Notu</Text>
-        {renderHelpText("İlacı ne zaman almanız gerektiğine dair özel not")}
+        <Text style={styles.label}>Başlangıç Tarihi</Text>
         <TouchableOpacity
-          style={styles.selectButton}
-          onPress={() => setShowTimingModal(true)}
+          style={styles.dateButton}
+          onPress={() => setShowStartDatePicker(true)}
         >
-          <MaterialIcons name="schedule" size={28} color="#2196F3" />
-          <Text style={styles.selectButtonText}>
-            {timingNote || "Zamanlama notu ekleyin"}
+          <Text>
+            {new Date(medicine.schedule.startDate).toLocaleDateString("tr-TR")}
           </Text>
         </TouchableOpacity>
+        {showStartDatePicker && (
+          <DateTimePicker
+            value={new Date(medicine.schedule.startDate)}
+            mode="date"
+            display="default"
+            onChange={(event, selectedDate) => {
+              setShowStartDatePicker(false);
+              if (selectedDate) {
+                setMedicine({
+                  ...medicine,
+                  schedule: {
+                    ...medicine.schedule,
+                    startDate: selectedDate.toISOString().split("T")[0],
+                  },
+                });
+              }
+            }}
+          />
+        )}
+      </View>
+
+      <View style={styles.formGroup}>
+        <Text style={styles.label}>Bitiş Tarihi (Opsiyonel)</Text>
+        <TouchableOpacity
+          style={styles.dateButton}
+          onPress={() => setShowEndDatePicker(true)}
+        >
+          <Text>
+            {medicine.schedule.endDate
+              ? new Date(medicine.schedule.endDate).toLocaleDateString("tr-TR")
+              : "Seçilmedi"}
+          </Text>
+        </TouchableOpacity>
+        {showEndDatePicker && (
+          <DateTimePicker
+            value={
+              medicine.schedule.endDate
+                ? new Date(medicine.schedule.endDate)
+                : new Date()
+            }
+            mode="date"
+            display="default"
+            onChange={(event, selectedDate) => {
+              setShowEndDatePicker(false);
+              if (selectedDate) {
+                setMedicine({
+                  ...medicine,
+                  schedule: {
+                    ...medicine.schedule,
+                    endDate: selectedDate.toISOString().split("T")[0],
+                  },
+                });
+              }
+            }}
+          />
+        )}
       </View>
 
       <View style={styles.formGroup}>
@@ -457,8 +502,8 @@ export const AddMedicineScreen = () => {
         {renderHelpText("İlaç hakkında eklemek istediğiniz notlar")}
         <TextInput
           style={[styles.input, styles.notesInput]}
-          value={notes}
-          onChangeText={setNotes}
+          value={medicine.notes}
+          onChangeText={(text) => setMedicine({ ...medicine, notes: text })}
           placeholder="Örn: Yemeklerden sonra alınmalı"
           placeholderTextColor="#757575"
           multiline
@@ -466,188 +511,30 @@ export const AddMedicineScreen = () => {
         />
       </View>
 
-      {/* Stok Bilgileri Bölümü */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Stok Bilgileri</Text>
-
-        <View style={styles.formGroup}>
-          <Text style={styles.label}>Stok Birimi</Text>
-          {renderHelpText("İlacın stok birimini seçiniz")}
-          <TouchableOpacity
-            style={styles.selectButton}
-            onPress={() => setShowStockUnitModal(true)}
-          >
-            <MaterialIcons name="inventory" size={28} color="#2196F3" />
-            <Text style={styles.selectButtonText}>
-              {STOCK_UNITS.find((unit) => unit.id === stockUnit)?.label}
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.formGroup}>
-          <Text style={styles.label}>Mevcut Stok Miktarı</Text>
-          {renderHelpText(
-            `Mevcut ${
-              STOCK_UNITS.find((unit) => unit.id === stockUnit)?.label
-            } sayısını giriniz`
-          )}
-          <TextInput
-            style={styles.input}
-            value={stockAmount}
-            onChangeText={setStockAmount}
-            keyboardType="numeric"
-            placeholder={`Örn: 30 ${stockUnit}`}
-            placeholderTextColor="#757575"
-          />
-        </View>
-
-        <View style={styles.formGroup}>
-          <Text style={styles.label}>Minimum Stok Uyarı Miktarı</Text>
-          {renderHelpText("Bu miktarın altına düştüğünde uyarı alacaksınız")}
-          <TextInput
-            style={styles.input}
-            value={stockThreshold}
-            onChangeText={setStockThreshold}
-            keyboardType="numeric"
-            placeholder="Örn: 10"
-            placeholderTextColor="#757575"
-          />
-        </View>
-      </View>
-
       <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
         <MaterialIcons name="save" size={28} color="white" />
         <Text style={styles.saveButtonText}>İlacı Kaydet</Text>
       </TouchableOpacity>
 
-      {showTimePicker && (
-        <Modal
-          visible={showTimePicker}
-          transparent
-          animationType="slide"
-          onRequestClose={() => setShowTimePicker(false)}
-        >
-          <View style={styles.timePickerModal}>
-            <View style={styles.timePickerContent}>
-              <View style={styles.timePickerHeader}>
-                <Text style={styles.timePickerTitle}>Saat Seçin</Text>
-                <TouchableOpacity onPress={() => setShowTimePicker(false)}>
-                  <MaterialIcons name="close" size={24} color="#757575" />
-                </TouchableOpacity>
-              </View>
-              <View style={styles.timePicker}>
-                <TouchableOpacity
-                  style={styles.timeOption}
-                  onPress={() => {
-                    const newTime = new Date();
-                    newTime.setHours(8, 0, 0);
-                    handleTimeSelect(newTime);
-                  }}
-                >
-                  <MaterialIcons name="wb-sunny" size={24} color="#2196F3" />
-                  <Text style={styles.timeOptionText}>Sabah (08:00)</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.timeOption}
-                  onPress={() => {
-                    const newTime = new Date();
-                    newTime.setHours(12, 0, 0);
-                    handleTimeSelect(newTime);
-                  }}
-                >
-                  <MaterialIcons
-                    name="brightness-5"
-                    size={24}
-                    color="#2196F3"
-                  />
-                  <Text style={styles.timeOptionText}>Öğle (12:00)</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.timeOption}
-                  onPress={() => {
-                    const newTime = new Date();
-                    newTime.setHours(18, 0, 0);
-                    handleTimeSelect(newTime);
-                  }}
-                >
-                  <MaterialIcons
-                    name="brightness-4"
-                    size={24}
-                    color="#2196F3"
-                  />
-                  <Text style={styles.timeOptionText}>Akşam (18:00)</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.timeOption}
-                  onPress={() => {
-                    const newTime = new Date();
-                    newTime.setHours(22, 0, 0);
-                    handleTimeSelect(newTime);
-                  }}
-                >
-                  <MaterialIcons
-                    name="brightness-3"
-                    size={24}
-                    color="#2196F3"
-                  />
-                  <Text style={styles.timeOptionText}>Gece (22:00)</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.timeOption, styles.customTimeOption]}
-                  onPress={() => {
-                    const newTime = new Date();
-                    handleTimeSelect(newTime);
-                  }}
-                >
-                  <MaterialIcons name="access-time" size={24} color="#2196F3" />
-                  <Text style={styles.timeOptionText}>Özel Saat Seç</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        </Modal>
-      )}
-
       {renderModal(
         showTypeModal,
         "İlaç Tipi Seçin",
         <View style={styles.modalOptions}>
-          {MEDICINE_TYPES.map((type) => (
+          {TYPE_OPTIONS.map((option) => (
             <TouchableOpacity
-              key={type}
+              key={option.value}
               style={styles.modalOption}
               onPress={() => {
-                setType(type);
+                handleTypeChange(option.value as string);
                 setShowTypeModal(false);
               }}
             >
               <MaterialIcons name="medication" size={24} color="#2196F3" />
-              <Text style={styles.modalOptionText}>{type}</Text>
+              <Text style={styles.modalOptionText}>{option.label}</Text>
             </TouchableOpacity>
           ))}
         </View>,
         () => setShowTypeModal(false)
-      )}
-
-      {renderModal(
-        showUsageModal,
-        "Kullanım Şekli Seçin",
-        <View style={styles.modalOptions}>
-          {USAGE_TYPES.map((usage) => (
-            <TouchableOpacity
-              key={usage}
-              style={styles.modalOption}
-              onPress={() => {
-                setUsageType(usage);
-                setShowUsageModal(false);
-              }}
-            >
-              <MaterialIcons name="restaurant" size={24} color="#2196F3" />
-              <Text style={styles.modalOptionText}>{usage}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>,
-        () => setShowUsageModal(false)
       )}
 
       {renderModal(
@@ -656,14 +543,14 @@ export const AddMedicineScreen = () => {
         <View style={styles.modalOptions}>
           {FREQUENCY_OPTIONS.map((option) => (
             <TouchableOpacity
-              key={option.id}
+              key={option.value}
               style={styles.modalOption}
               onPress={() => {
-                setFrequency(option.id);
+                handleFrequencyChange(option.value as string);
                 setShowFrequencyModal(false);
               }}
             >
-              <MaterialIcons name={option.icon} size={24} color="#2196F3" />
+              <MaterialIcons name="today" size={24} color="#2196F3" />
               <Text style={styles.modalOptionText}>{option.label}</Text>
             </TouchableOpacity>
           ))}
@@ -673,63 +560,29 @@ export const AddMedicineScreen = () => {
 
       {renderModal(
         showTimingModal,
-        "Zamanlama Notu Seçin",
+        "Kullanım Zamanı Seçin",
         <View style={styles.modalOptions}>
-          {TIMING_OPTIONS.map((option) => (
+          {TIME_OPTIONS.map((option) => (
             <TouchableOpacity
               key={option.value}
               style={styles.modalOption}
               onPress={() => {
-                setTimingNote(option.value);
+                handleTimeSelect(option.value);
                 setShowTimingModal(false);
               }}
             >
-              <MaterialIcons name="schedule" size={24} color="#2196F3" />
+              <MaterialIcons name="access-time" size={24} color="#2196F3" />
               <Text style={styles.modalOptionText}>{option.label}</Text>
             </TouchableOpacity>
           ))}
         </View>,
         () => setShowTimingModal(false)
       )}
-
-      {/* Stok Birimi Seçme Modalı */}
-      {renderModal(
-        showStockUnitModal,
-        "Stok Birimi Seçin",
-        <View>
-          {STOCK_UNITS.map((unit) => (
-            <TouchableOpacity
-              key={unit.id}
-              style={[
-                styles.modalOption,
-                stockUnit === unit.id && styles.modalOptionSelected,
-              ]}
-              onPress={() => {
-                setStockUnit(unit.id);
-                setShowStockUnitModal(false);
-              }}
-            >
-              <MaterialIcons
-                name="inventory"
-                size={24}
-                color={stockUnit === unit.id ? "#2196F3" : "#757575"}
-              />
-              <Text
-                style={[
-                  styles.modalOptionText,
-                  stockUnit === unit.id && styles.modalOptionTextSelected,
-                ]}
-              >
-                {unit.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>,
-        () => setShowStockUnitModal(false)
-      )}
     </ScrollView>
   );
 };
+
+export default AddMedicineScreen;
 
 const styles = StyleSheet.create({
   container: {
@@ -778,30 +631,26 @@ const styles = StyleSheet.create({
     color: "#212121",
     marginLeft: 12,
   },
-  daysContainer: {
+  dosageContainer: {
     flexDirection: "row",
-    flexWrap: "wrap",
+    alignItems: "center",
     gap: 8,
   },
-  dayButton: {
+  dosageInput: {
+    flex: 1,
+  },
+  unitButton: {
     backgroundColor: "white",
-    borderRadius: 8,
-    padding: 12,
-    minWidth: 48,
-    alignItems: "center",
+    borderRadius: 12,
+    padding: 16,
     borderWidth: 1,
     borderColor: "#E0E0E0",
+    minWidth: 80,
+    alignItems: "center",
   },
-  dayButtonSelected: {
-    backgroundColor: "#2196F3",
-    borderColor: "#2196F3",
-  },
-  dayButtonText: {
-    fontSize: 18,
+  unitButtonText: {
+    fontSize: 20,
     color: "#212121",
-  },
-  dayButtonTextSelected: {
-    color: "white",
   },
   saveButton: {
     flexDirection: "row",
@@ -857,66 +706,6 @@ const styles = StyleSheet.create({
     color: "#212121",
     marginLeft: 12,
   },
-  timePickerModal: {
-    flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  timePickerContent: {
-    backgroundColor: "white",
-    borderRadius: 16,
-    padding: 20,
-    width: "90%",
-    maxWidth: 400,
-  },
-  timePickerHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 20,
-  },
-  timePickerTitle: {
-    fontSize: 24,
-    fontWeight: "500",
-    color: "#212121",
-  },
-  timePicker: {
-    gap: 12,
-  },
-  timeOption: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 16,
-    backgroundColor: "#F5F5F5",
-    borderRadius: 12,
-  },
-  timeOptionText: {
-    fontSize: 20,
-    color: "#212121",
-    marginLeft: 12,
-  },
-  customTimeOption: {
-    backgroundColor: "#E3F2FD",
-  },
-  section: {
-    backgroundColor: "white",
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: "500",
-    color: "#212121",
-    marginBottom: 16,
-  },
-  modalOptionSelected: {
-    backgroundColor: "#E3F2FD",
-  },
-  modalOptionTextSelected: {
-    color: "#2196F3",
-  },
   imageButton: {
     width: "100%",
     height: 200,
@@ -966,20 +755,40 @@ const styles = StyleSheet.create({
     color: "#757575",
     marginBottom: 16,
   },
-  ocrInfoContainer: {
-    backgroundColor: "#F5F5F5",
+  timeContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+  },
+  timeButton: {
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#ddd",
+    backgroundColor: "#fff",
+  },
+  timeButtonSelected: {
+    backgroundColor: "#2196F3",
+    borderColor: "#2196F3",
+  },
+  timeButtonText: {
+    fontSize: 16,
+    color: "#333",
+  },
+  timeButtonTextSelected: {
+    color: "#fff",
+  },
+  dateButton: {
+    borderWidth: 1,
+    borderColor: "#ddd",
     borderRadius: 8,
     padding: 12,
+    backgroundColor: "#fff",
   },
-  ocrInfoTitle: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#212121",
-    marginBottom: 8,
-  },
-  ocrInfoText: {
-    fontSize: 14,
-    color: "#424242",
-    marginBottom: 4,
+  picker: {
+    borderWidth: 1,
+    borderColor: "#ddd",
+    borderRadius: 8,
+    backgroundColor: "#fff",
   },
 });

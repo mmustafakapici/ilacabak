@@ -220,3 +220,4 @@ Size bu ilaç takip uygulaması için bir UI guideline yazacağım. Türkçe ola
 - Çıkış Easing: cubic-bezier(0.4, 0, 1, 1)
 
 Bu tasarım kılavuzu, yaşlı kullanıcıların rahatça kullanabileceği, görsel açıdan net ve tutarlı bir arayüz oluşturmayı hedeflemektedir. Tüm ölçüler ve değerler, erişilebilirlik standartlarına uygun olarak belirlenmiştir.
+sudo yarn kullan 

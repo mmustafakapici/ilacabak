@@ -11,10 +11,11 @@ interface MedicineContextType {
   medicines: ReminderMedicine[];
   reminderCount: number;
   loadMedicines: () => Promise<void>;
+  refreshMedicines: () => Promise<void>;
   updateMedicine: (medicine: Medicine) => Promise<void>;
   addMedicine: (medicine: Medicine) => Promise<void>;
   deleteMedicine: (id: string) => Promise<void>;
-  toggleMedicineTaken: (id: string) => Promise<void>;
+  toggleMedicineTaken: (id: string, time: string) => Promise<void>;
 }
 
 const MedicineContext = createContext<MedicineContextType | undefined>(
@@ -30,7 +31,28 @@ export const MedicineProvider: React.FC<{ children: React.ReactNode }> = ({
   const calculateMedicineStatus = (medicine: Medicine): ReminderMedicine => {
     const now = new Date();
     const currentTime = now.getHours() * 60 + now.getMinutes();
-    const [hours, minutes] = medicine.time.split(":").map(Number);
+
+    // İlaç için en yakın hatırlatıcıyı bul
+    const nextReminder = medicine.schedule.reminders
+      .filter((reminder) => reminder.enabled)
+      .sort((a, b) => {
+        const [aHours, aMinutes] = a.time.split(":").map(Number);
+        const [bHours, bMinutes] = b.time.split(":").map(Number);
+        const aTime = aHours * 60 + aMinutes;
+        const bTime = bHours * 60 + bMinutes;
+        return aTime - bTime;
+      })[0];
+
+    if (!nextReminder) {
+      return {
+        ...medicine,
+        isLate: false,
+        minutesLate: undefined,
+        timeUntil: undefined,
+      };
+    }
+
+    const [hours, minutes] = nextReminder.time.split(":").map(Number);
     const medicineTime = hours * 60 + minutes;
     const timeDiff = currentTime - medicineTime;
 
@@ -63,6 +85,10 @@ export const MedicineProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   };
 
+  const refreshMedicines = async () => {
+    await loadMedicines();
+  };
+
   const updateMedicine = async (medicine: Medicine) => {
     try {
       const updatedMedicines = medicines.map((med) =>
@@ -70,6 +96,7 @@ export const MedicineProvider: React.FC<{ children: React.ReactNode }> = ({
       );
       await StorageService.saveMedicines(updatedMedicines);
       await loadMedicines();
+      await refreshMedicines();
     } catch (error) {
       console.error("İlaç güncellenirken hata:", error);
     }
@@ -81,6 +108,7 @@ export const MedicineProvider: React.FC<{ children: React.ReactNode }> = ({
       const updatedMedicines = [...medicines, newMedicine];
       await StorageService.saveMedicines(updatedMedicines);
       await loadMedicines();
+      await refreshMedicines();
     } catch (error) {
       console.error("İlaç eklenirken hata:", error);
     }
@@ -91,27 +119,45 @@ export const MedicineProvider: React.FC<{ children: React.ReactNode }> = ({
       const updatedMedicines = medicines.filter((med) => med.id !== id);
       await StorageService.saveMedicines(updatedMedicines);
       await loadMedicines();
+      await refreshMedicines();
     } catch (error) {
       console.error("İlaç silinirken hata:", error);
     }
   };
 
-  const toggleMedicineTaken = async (id: string) => {
+  const toggleMedicineTaken = async (id: string, time: string) => {
     try {
-      const updatedMedicines = medicines.map((med) =>
-        med.id === id
-          ? calculateMedicineStatus({ ...med, taken: !med.taken })
-          : med
-      );
+      const updatedMedicines = medicines.map((med) => {
+        if (med.id === id) {
+          // İlgili hatırlatıcıyı bul ve güncelle
+          const updatedReminders = med.schedule.reminders.map((reminder) => {
+            if (reminder.time === time) {
+              return { ...reminder, enabled: !reminder.enabled };
+            }
+            return reminder;
+          });
+
+          return calculateMedicineStatus({
+            ...med,
+            schedule: {
+              ...med.schedule,
+              reminders: updatedReminders,
+            },
+          });
+        }
+        return med;
+      });
+
       await StorageService.saveMedicines(updatedMedicines);
       await loadMedicines();
+      await refreshMedicines();
     } catch (error) {
       console.error("İlaç durumu güncellenirken hata:", error);
     }
   };
 
   useEffect(() => {
-    const interval = setInterval(loadMedicines, 60000); // Her dakika güncelle
+    const interval = setInterval(loadMedicines, 30000); // Her 30 saniyede bir güncelle
     loadMedicines();
     return () => clearInterval(interval);
   }, []);
@@ -120,6 +166,7 @@ export const MedicineProvider: React.FC<{ children: React.ReactNode }> = ({
     medicines,
     reminderCount,
     loadMedicines,
+    refreshMedicines,
     updateMedicine,
     addMedicine,
     deleteMedicine,

@@ -1,17 +1,20 @@
 export interface Medicine {
   id: string;
   name: string;
-  dosage: string;
+  dosage: {
+    amount: number;
+    unit: string;
+  };
   type: string;
-  usageType: string;
-  frequency: string;
-  time: string;
-  timingNote?: string;
-  selectedDays: number[];
+  usage: {
+    frequency: string;
+    time: string[];
+  };
+  schedule: {
+    startDate: string;
+    endDate: string | null;
+    reminders: string[];
+  };
   notes?: string;
-  taken: boolean;
-  stockAmount: number;
-  stockUnit: string;
-  stockThreshold: number;
-  stockLastUpdated: string;
+  image?: string;
 } 

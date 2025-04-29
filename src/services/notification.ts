@@ -1,5 +1,7 @@
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
+import { Medicine } from '../types/medicine';
+import { MedicineUsage } from '../types/usage';
 
 // Bildirim izinlerini ayarla
 Notifications.setNotificationHandler({
@@ -27,29 +29,85 @@ export const NotificationService = {
     return true;
   },
 
-  // Demo bildirimi gönder
-  async sendDemoNotification(minutes: number) {
+  // İlaç hatırlatma bildirimi gönder
+  async scheduleMedicineNotification(medicine: Medicine) {
     try {
       await this.requestPermissions();
 
-      // Bildirim içeriği
+      // Her kullanım zamanı için bildirim oluştur
+      for (const time of medicine.usage.time) {
+        const notificationContent = {
+          title: "💊 İlaç Saati",
+          body: `${medicine.name} ilacınızı almanız gerekiyor.`,
+          sound: true,
+          priority: Notifications.AndroidNotificationPriority.HIGH,
+          data: { 
+            type: 'medicine',
+            medicineId: medicine.id,
+            time: time
+          },
+        };
+
+        // Bildirim zamanını hesapla
+        const [hours, minutes] = time.split(':').map(Number);
+        const now = new Date();
+        const notificationTime = new Date(
+          now.getFullYear(),
+          now.getMonth(),
+          now.getDate(),
+          hours,
+          minutes
+        );
+
+        // Eğer zaman geçmişse, ertesi güne ayarla
+        if (notificationTime < now) {
+          notificationTime.setDate(notificationTime.getDate() + 1);
+        }
+
+        // Bildirimi planla
+        await Notifications.scheduleNotificationAsync({
+          content: notificationContent,
+          trigger: {
+            type: 'timeInterval',
+            seconds: Math.floor((notificationTime.getTime() - now.getTime()) / 1000),
+            repeats: true
+          },
+        });
+      }
+
+      return true;
+    } catch (error) {
+      console.error('İlaç bildirimi planlanırken hata:', error);
+      return false;
+    }
+  },
+
+  // İlaç alınmadı uyarı bildirimi gönder
+  async sendMissedMedicineNotification(medicine: Medicine, time: string) {
+    try {
+      await this.requestPermissions();
+
       const notificationContent = {
-        title: "İlaç Hatırlatması",
-        body: `${minutes} dakika sonra ilaç saatiniz gelecek!`,
+        title: "⚠️ İlaç Hatırlatması",
+        body: `${medicine.name} ilacınızı ${time} saatinde almadınız!`,
         sound: true,
-        priority: Notifications.AndroidNotificationPriority.HIGH,
-        data: { type: 'demo', minutes },
+        priority: Notifications.AndroidNotificationPriority.MAX,
+        data: { 
+          type: 'missed_medicine',
+          medicineId: medicine.id,
+          time: time
+        },
       };
 
-      // 10 saniye sonra bildirim gönder
+      // Hemen bildirim gönder
       await Notifications.scheduleNotificationAsync({
         content: notificationContent,
-        trigger: { seconds: 10 },
+        trigger: null,
       });
 
       return true;
     } catch (error) {
-      console.error('Demo bildirimi gönderilirken hata:', error);
+      console.error('İlaç alınmadı bildirimi gönderilirken hata:', error);
       return false;
     }
   },
@@ -59,7 +117,6 @@ export const NotificationService = {
     try {
       await this.requestPermissions();
 
-      // Bildirim içeriği
       const notificationContent = {
         title: "🚨 ACİL DURUM!",
         body: "Kullanıcı acil durum butonuna bastı! Lütfen hemen kontrol edin.",
@@ -78,6 +135,18 @@ export const NotificationService = {
     } catch (error) {
       console.error('Acil durum bildirimi gönderilirken hata:', error);
       return false;
+    }
+  },
+
+  // Belirli bir ilacın tüm bildirimlerini iptal et
+  async cancelMedicineNotifications(medicineId: string) {
+    const notifications = await Notifications.getAllScheduledNotificationsAsync();
+    const medicineNotifications = notifications.filter(
+      notification => notification.content.data.medicineId === medicineId
+    );
+    
+    for (const notification of medicineNotifications) {
+      await Notifications.cancelScheduledNotificationAsync(notification.identifier);
     }
   },
 

@@ -1,4 +1,10 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Medicine } from '../types/medicine';
+import { MedicineUsage } from '../types/usage';
+import { UsageService } from './UsageService';
+import { UserProfile } from '../types/user';
+import { Settings } from '../types/settings';
+import { Relative } from '../types/relative';
 
 // Storage anahtarları
 const STORAGE_KEYS = {
@@ -7,28 +13,35 @@ const STORAGE_KEYS = {
   SETTINGS: '@settings',
   RELATIVES: '@relatives',
   NOTIFICATIONS: '@notifications',
+  FIRST_LAUNCH: '@first_launch',
 };
 
 // İlaç verisi için tip tanımı
 export interface Medicine {
   id: string;
   name: string;
-  type: string; // Tablet, Şurup, İğne, vb.
-  dosage: string;
-  frequency: "daily" | "weekly" | "custom";
-  time: string;
-  usageType: string; // Aç/Tok Karnına
-  timingNote?: string; // Yemekten kaç dakika önce/sonra
-  selectedDays?: number[]; // Haftalık kullanım için seçilen günler
+  dosage: {
+    amount: number;
+    unit: string;
+  };
+  type: string;
+  usage: {
+    frequency: string;
+    time: string[];
+    condition?: string;
+  };
+  schedule: {
+    startDate: string;
+    endDate?: string;
+    reminders: Array<{
+      time: string;
+      enabled: boolean;
+    }>;
+  };
   notes?: string;
-  taken: boolean;
-  color?: string; // İlacın rengi/görünümü
-  image?: string; // İlaç görseli (opsiyonel)
-  stockAmount: number; // Mevcut stok miktarı
-  stockUnit: string; // Stok birimi (tablet, kapsül, ml vs.)
-  stockThreshold: number; // Uyarı eşiği (bu miktarın altına düşünce uyarı verilir)
-  stockLastUpdated: string; // Son stok güncellemesi tarihi
-  date: string; // İlaç kullanım tarihi
+  image?: string;
+  taken?: boolean;
+  lastTaken?: string;
 }
 
 // Kullanıcı profili için tip tanımı
@@ -46,7 +59,7 @@ export interface Settings {
   notifyRelatives: boolean;
   voiceEnabled: boolean;
   theme: "light" | "dark" | "auto";
-  fontSize: 'normal' | 'large' | 'extra-large';
+  fontSize: 'small' | 'medium' | 'large';
   notificationTimes: number[]; // Dakika cinsinden bildirim zamanları
 }
 
@@ -77,457 +90,15 @@ export interface Appointment {
   type: string;
 }
 
-// Örnek ilaç şablonları
-const MEDICINE_TEMPLATES = [
-  {
-    name: "Lisinopril",
-    type: "Tablet",
-    dosage: "10mg",
-    frequency: "daily" as const,
-    time: "08:00",
-    usageType: "Aç karnına",
-    timingNote: "Yemekten 1 saat önce",
-    notes: "Tansiyon ilacı",
-    color: "Beyaz",
-    stockAmount: 45,
-    stockUnit: "tablet",
-    stockThreshold: 10,
-  },
-  {
-    name: "Metformin",
-    type: "Tablet",
-    dosage: "850mg",
-    frequency: "daily" as const,
-    time: "12:00",
-    usageType: "Tok karnına",
-    timingNote: "Yemekten 30 dakika sonra",
-    notes: "Diyabet ilacı",
-    color: "Beyaz",
-    stockAmount: 60,
-    stockUnit: "tablet",
-    stockThreshold: 15,
-  },
-  {
-    name: "Aspirin",
-    type: "Tablet",
-    dosage: "100mg",
-    frequency: "daily" as const,
-    time: "20:00",
-    usageType: "Tok karnına",
-    timingNote: "Yemekten 1 saat sonra",
-    notes: "Kan sulandırıcı",
-    color: "Beyaz",
-    stockAmount: 90,
-    stockUnit: "tablet",
-    stockThreshold: 20,
-  },
-  {
-    name: "Vitamin D",
-    type: "Tablet",
-    dosage: "1000 IU",
-    frequency: "daily" as const,
-    time: "09:00",
-    usageType: "Tok karnına",
-    timingNote: "Kahvaltıdan sonra",
-    notes: "Vitamin takviyesi",
-    color: "Sarı",
-    stockAmount: 30,
-    stockUnit: "tablet",
-    stockThreshold: 10,
-  },
-  {
-    name: "Omeprazol",
-    type: "Kapsül",
-    dosage: "20mg",
-    frequency: "daily" as const,
-    time: "07:00",
-    usageType: "Aç karnına",
-    timingNote: "Kahvaltıdan 30 dakika önce",
-    notes: "Mide koruyucu",
-    color: "Beyaz",
-    stockAmount: 40,
-    stockUnit: "kapsül",
-    stockThreshold: 10,
-  },
-];
-
-// Örnek ilaçlar ekleyelim
-const SAMPLE_MEDICINES: Medicine[] = [
-  // Bugünkü ilaçlar (1 Nisan 2025)
-  {
-    id: "1",
-    name: "Lisinopril",
-    type: "Tablet",
-    dosage: "10mg",
-    frequency: "daily",
-    time: "08:00",
-    usageType: "Aç karnına",
-    timingNote: "Yemekten 1 saat önce",
-    notes: "Tansiyon ilacı",
-    taken: true,
-    color: "Beyaz",
-    stockAmount: 45,
-    stockUnit: "tablet",
-    stockThreshold: 10,
-    stockLastUpdated: "2025-04-01",
-    date: "2025-04-01",
-  },
-  {
-    id: "2",
-    name: "Metformin",
-    type: "Tablet",
-    dosage: "850mg",
-    frequency: "daily",
-    time: "12:00",
-    usageType: "Tok karnına",
-    timingNote: "Yemekten 30 dakika sonra",
-    notes: "Diyabet ilacı",
-    taken: true,
-    color: "Beyaz",
-    stockAmount: 60,
-    stockUnit: "tablet",
-    stockThreshold: 15,
-    stockLastUpdated: "2025-04-01",
-    date: "2025-04-01",
-  },
-  {
-    id: "3",
-    name: "Aspirin",
-    type: "Tablet",
-    dosage: "100mg",
-    frequency: "daily",
-    time: "20:00",
-    usageType: "Tok karnına",
-    timingNote: "Yemekten 1 saat sonra",
-    notes: "Kan sulandırıcı",
-    taken: true,
-    color: "Beyaz",
-    stockAmount: 90,
-    stockUnit: "tablet",
-    stockThreshold: 20,
-    stockLastUpdated: "2025-04-01",
-    date: "2025-04-01",
-  },
-  {
-    id: "4",
-    name: "Vitamin D",
-    type: "Tablet",
-    dosage: "1000 IU",
-    frequency: "daily",
-    time: "09:00",
-    usageType: "Tok karnına",
-    timingNote: "Kahvaltıdan sonra",
-    notes: "Vitamin takviyesi",
-    taken: true,
-    color: "Sarı",
-    stockAmount: 30,
-    stockUnit: "tablet",
-    stockThreshold: 10,
-    stockLastUpdated: "2025-04-01",
-    date: "2025-04-01",
-  },
-  {
-    id: "5",
-    name: "Omeprazol",
-    type: "Kapsül",
-    dosage: "20mg",
-    frequency: "daily",
-    time: "07:00",
-    usageType: "Aç karnına",
-    timingNote: "Kahvaltıdan 30 dakika önce",
-    notes: "Mide koruyucu",
-    taken: true,
-    color: "Beyaz",
-    stockAmount: 40,
-    stockUnit: "kapsül",
-    stockThreshold: 10,
-    stockLastUpdated: "2025-04-01",
-    date: "2025-04-01",
-  },
-  // Dünkü ilaçlar (31 Mart 2025)
-  {
-    id: "6",
-    name: "Lisinopril",
-    type: "Tablet",
-    dosage: "10mg",
-    frequency: "daily",
-    time: "08:00",
-    usageType: "Aç karnına",
-    timingNote: "Yemekten 1 saat önce",
-    notes: "Tansiyon ilacı",
-    taken: true,
-    color: "Beyaz",
-    stockAmount: 45,
-    stockUnit: "tablet",
-    stockThreshold: 10,
-    stockLastUpdated: "2025-03-31",
-    date: "2025-03-31",
-  },
-  {
-    id: "7",
-    name: "Metformin",
-    type: "Tablet",
-    dosage: "850mg",
-    frequency: "daily",
-    time: "12:00",
-    usageType: "Tok karnına",
-    timingNote: "Yemekten 30 dakika sonra",
-    notes: "Diyabet ilacı",
-    taken: true,
-    color: "Beyaz",
-    stockAmount: 60,
-    stockUnit: "tablet",
-    stockThreshold: 15,
-    stockLastUpdated: "2025-03-31",
-    date: "2025-03-31",
-  },
-  {
-    id: "8",
-    name: "Aspirin",
-    type: "Tablet",
-    dosage: "100mg",
-    frequency: "daily",
-    time: "20:00",
-    usageType: "Tok karnına",
-    timingNote: "Yemekten 1 saat sonra",
-    notes: "Kan sulandırıcı",
-    taken: true,
-    color: "Beyaz",
-    stockAmount: 90,
-    stockUnit: "tablet",
-    stockThreshold: 20,
-    stockLastUpdated: "2025-03-31",
-    date: "2025-03-31",
-  },
-  {
-    id: "9",
-    name: "Vitamin D",
-    type: "Tablet",
-    dosage: "1000 IU",
-    frequency: "daily",
-    time: "09:00",
-    usageType: "Tok karnına",
-    timingNote: "Kahvaltıdan sonra",
-    notes: "Vitamin takviyesi",
-    taken: true,
-    color: "Sarı",
-    stockAmount: 30,
-    stockUnit: "tablet",
-    stockThreshold: 10,
-    stockLastUpdated: "2025-03-31",
-    date: "2025-03-31",
-  },
-  {
-    id: "10",
-    name: "Omeprazol",
-    type: "Kapsül",
-    dosage: "20mg",
-    frequency: "daily",
-    time: "07:00",
-    usageType: "Aç karnına",
-    timingNote: "Kahvaltıdan 30 dakika önce",
-    notes: "Mide koruyucu",
-    taken: true,
-    color: "Beyaz",
-    stockAmount: 40,
-    stockUnit: "kapsül",
-    stockThreshold: 10,
-    stockLastUpdated: "2025-03-31",
-    date: "2025-03-31",
-  },
-  // Önceki günün ilaçları (30 Mart 2025)
-  {
-    id: "11",
-    name: "Lisinopril",
-    type: "Tablet",
-    dosage: "10mg",
-    frequency: "daily",
-    time: "08:00",
-    usageType: "Aç karnına",
-    timingNote: "Yemekten 1 saat önce",
-    notes: "Tansiyon ilacı",
-    taken: true,
-    color: "Beyaz",
-    stockAmount: 45,
-    stockUnit: "tablet",
-    stockThreshold: 10,
-    stockLastUpdated: "2025-03-30",
-    date: "2025-03-30",
-  },
-  {
-    id: "12",
-    name: "Metformin",
-    type: "Tablet",
-    dosage: "850mg",
-    frequency: "daily",
-    time: "12:00",
-    usageType: "Tok karnına",
-    timingNote: "Yemekten 30 dakika sonra",
-    notes: "Diyabet ilacı",
-    taken: true,
-    color: "Beyaz",
-    stockAmount: 60,
-    stockUnit: "tablet",
-    stockThreshold: 15,
-    stockLastUpdated: "2025-03-30",
-    date: "2025-03-30",
-  },
-  {
-    id: "13",
-    name: "Aspirin",
-    type: "Tablet",
-    dosage: "100mg",
-    frequency: "daily",
-    time: "20:00",
-    usageType: "Tok karnına",
-    timingNote: "Yemekten 1 saat sonra",
-    notes: "Kan sulandırıcı",
-    taken: true,
-    color: "Beyaz",
-    stockAmount: 90,
-    stockUnit: "tablet",
-    stockThreshold: 20,
-    stockLastUpdated: "2025-03-30",
-    date: "2025-03-30",
-  },
-  {
-    id: "14",
-    name: "Vitamin D",
-    type: "Tablet",
-    dosage: "1000 IU",
-    frequency: "daily",
-    time: "09:00",
-    usageType: "Tok karnına",
-    timingNote: "Kahvaltıdan sonra",
-    notes: "Vitamin takviyesi",
-    taken: true,
-    color: "Sarı",
-    stockAmount: 30,
-    stockUnit: "tablet",
-    stockThreshold: 10,
-    stockLastUpdated: "2025-03-30",
-    date: "2025-03-30",
-  },
-  {
-    id: "15",
-    name: "Omeprazol",
-    type: "Kapsül",
-    dosage: "20mg",
-    frequency: "daily",
-    time: "07:00",
-    usageType: "Aç karnına",
-    timingNote: "Kahvaltıdan 30 dakika önce",
-    notes: "Mide koruyucu",
-    taken: true,
-    color: "Beyaz",
-    stockAmount: 40,
-    stockUnit: "kapsül",
-    stockThreshold: 10,
-    stockLastUpdated: "2025-03-30",
-    date: "2025-03-30",
-  },
-  // 28 Şubat 2025'ten itibaren kullanılan ilaçlar
-  {
-    id: "16",
-    name: "Lisinopril",
-    type: "Tablet",
-    dosage: "10mg",
-    frequency: "daily",
-    time: "08:00",
-    usageType: "Aç karnına",
-    timingNote: "Yemekten 1 saat önce",
-    notes: "Tansiyon ilacı",
-    taken: true,
-    color: "Beyaz",
-    stockAmount: 45,
-    stockUnit: "tablet",
-    stockThreshold: 10,
-    stockLastUpdated: "2025-02-28",
-    date: "2025-02-28",
-  },
-  {
-    id: "17",
-    name: "Metformin",
-    type: "Tablet",
-    dosage: "850mg",
-    frequency: "daily",
-    time: "12:00",
-    usageType: "Tok karnına",
-    timingNote: "Yemekten 30 dakika sonra",
-    notes: "Diyabet ilacı",
-    taken: true,
-    color: "Beyaz",
-    stockAmount: 60,
-    stockUnit: "tablet",
-    stockThreshold: 15,
-    stockLastUpdated: "2025-02-28",
-    date: "2025-02-28",
-  },
-  {
-    id: "18",
-    name: "Aspirin",
-    type: "Tablet",
-    dosage: "100mg",
-    frequency: "daily",
-    time: "20:00",
-    usageType: "Tok karnına",
-    timingNote: "Yemekten 1 saat sonra",
-    notes: "Kan sulandırıcı",
-    taken: true,
-    color: "Beyaz",
-    stockAmount: 90,
-    stockUnit: "tablet",
-    stockThreshold: 20,
-    stockLastUpdated: "2025-02-28",
-    date: "2025-02-28",
-  },
-  {
-    id: "19",
-    name: "Vitamin D",
-    type: "Tablet",
-    dosage: "1000 IU",
-    frequency: "daily",
-    time: "09:00",
-    usageType: "Tok karnına",
-    timingNote: "Kahvaltıdan sonra",
-    notes: "Vitamin takviyesi",
-    taken: true,
-    color: "Sarı",
-    stockAmount: 30,
-    stockUnit: "tablet",
-    stockThreshold: 10,
-    stockLastUpdated: "2025-02-28",
-    date: "2025-02-28",
-  },
-  {
-    id: "20",
-    name: "Omeprazol",
-    type: "Kapsül",
-    dosage: "20mg",
-    frequency: "daily",
-    time: "07:00",
-    usageType: "Aç karnına",
-    timingNote: "Kahvaltıdan 30 dakika önce",
-    notes: "Mide koruyucu",
-    taken: true,
-    color: "Beyaz",
-    stockAmount: 40,
-    stockUnit: "kapsül",
-    stockThreshold: 10,
-    stockLastUpdated: "2025-02-28",
-    date: "2025-02-28",
-  }
-];
-
 // Storage servisi
 export const StorageService = {
   // İlaçlar
   async getMedicines(): Promise<Medicine[]> {
     try {
-      const medicines = await AsyncStorage.getItem(STORAGE_KEYS.MEDICINES);
-      return medicines ? JSON.parse(medicines) : [];
+      const medicinesJson = await AsyncStorage.getItem(STORAGE_KEYS.MEDICINES);
+      return medicinesJson ? JSON.parse(medicinesJson) : [];
     } catch (error) {
-      console.error('İlaçlar alınırken hata:', error);
+      console.error('İlaçlar okunurken hata:', error);
       return [];
     }
   },
@@ -537,6 +108,7 @@ export const StorageService = {
       await AsyncStorage.setItem(STORAGE_KEYS.MEDICINES, JSON.stringify(medicines));
     } catch (error) {
       console.error('İlaçlar kaydedilirken hata:', error);
+      throw error;
     }
   },
 
@@ -545,8 +117,69 @@ export const StorageService = {
       const medicines = await this.getMedicines();
       medicines.push(medicine);
       await this.saveMedicines(medicines);
+
+      // İlaç eklendiğinde kullanım kaydı oluştur
+      const usage: MedicineUsage = {
+        id: Date.now().toString(),
+        medicineId: medicine.id,
+        date: new Date().toISOString().split('T')[0],
+        time: medicine.schedule.reminders[0]?.time || '00:00',
+        dosage: medicine.dosage,
+        taken: false,
+        notes: 'İlaç kaydı oluşturuldu'
+      };
+
+      await UsageService.addUsage(usage);
     } catch (error) {
       console.error('İlaç eklenirken hata:', error);
+    }
+  },
+
+  async updateMedicine(medicine: Medicine): Promise<void> {
+    try {
+      const medicines = await this.getMedicines();
+      const updatedMedicines = medicines.map((med) =>
+        med.id === medicine.id ? medicine : med
+      );
+      await this.saveMedicines(updatedMedicines);
+
+      // İlaç güncellendiğinde kullanım kaydı oluştur
+      const usage: MedicineUsage = {
+        id: Date.now().toString(),
+        medicineId: medicine.id,
+        date: new Date().toISOString().split('T')[0],
+        time: medicine.schedule.reminders[0]?.time || '00:00',
+        dosage: medicine.dosage,
+        taken: false,
+        notes: 'İlaç bilgileri güncellendi'
+      };
+
+      await UsageService.addUsage(usage);
+    } catch (error) {
+      console.error('İlaç güncellenirken hata:', error);
+    }
+  },
+
+  async deleteMedicine(id: string): Promise<void> {
+    try {
+      const medicines = await this.getMedicines();
+      const updatedMedicines = medicines.filter((med) => med.id !== id);
+      await this.saveMedicines(updatedMedicines);
+
+      // İlaç silindiğinde kullanım kaydı oluştur
+      const usage: MedicineUsage = {
+        id: Date.now().toString(),
+        medicineId: id,
+        date: new Date().toISOString().split('T')[0],
+        time: '00:00',
+        dosage: { amount: 0, unit: 'tablet' },
+        taken: false,
+        notes: 'İlaç kaydı silindi'
+      };
+
+      await UsageService.addUsage(usage);
+    } catch (error) {
+      console.error('İlaç silinirken hata:', error);
     }
   },
 
@@ -566,55 +199,41 @@ export const StorageService = {
       await AsyncStorage.setItem(STORAGE_KEYS.USER_PROFILE, JSON.stringify(profile));
     } catch (error) {
       console.error('Profil kaydedilirken hata:', error);
-    }
-  },
-
-  // Ayarlar
-  async saveSettings(settings: Settings): Promise<void> {
-    try {
-      await AsyncStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(settings));
-    } catch (error) {
-      console.error('Ayarlar kaydedilirken hata oluştu:', error);
       throw error;
     }
   },
 
+  // Ayarlar
   async getSettings(): Promise<Settings> {
     try {
       const settings = await AsyncStorage.getItem(STORAGE_KEYS.SETTINGS);
       if (settings) {
         return JSON.parse(settings);
       }
-      // Ayarlar yoksa varsayılan ayarları kaydet ve döndür
-      await this.saveSettings({
+      // Varsayılan ayarlar
+      const defaultSettings: Settings = {
         soundEnabled: true,
         vibrationEnabled: true,
         voiceEnabled: true,
         notifyRelatives: true,
         theme: 'light',
-        fontSize: 'normal',
-        notificationTimes: [1, 5, 15, 30, 60], // Varsayılan bildirim zamanları
-      });
-      return {
-        soundEnabled: true,
-        vibrationEnabled: true,
-        voiceEnabled: true,
-        notifyRelatives: true,
-        theme: 'light',
-        fontSize: 'normal',
+        fontSize: 'medium',
         notificationTimes: [1, 5, 15, 30, 60],
       };
+      await this.saveSettings(defaultSettings);
+      return defaultSettings;
     } catch (error) {
-      console.error('Ayarlar alınırken hata oluştu:', error);
-      return {
-        soundEnabled: true,
-        vibrationEnabled: true,
-        voiceEnabled: true,
-        notifyRelatives: true,
-        theme: 'light',
-        fontSize: 'normal',
-        notificationTimes: [1, 5, 15, 30, 60],
-      };
+      console.error('Ayarlar alınırken hata:', error);
+      throw error;
+    }
+  },
+
+  async saveSettings(settings: Settings): Promise<void> {
+    try {
+      await AsyncStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(settings));
+    } catch (error) {
+      console.error('Ayarlar kaydedilirken hata:', error);
+      throw error;
     }
   },
 
@@ -665,6 +284,7 @@ export const StorageService = {
       await AsyncStorage.setItem(STORAGE_KEYS.RELATIVES, JSON.stringify(relatives));
     } catch (error) {
       console.error('Yakınlar kaydedilirken hata:', error);
+      throw error;
     }
   },
 
@@ -687,45 +307,33 @@ export const StorageService = {
     }
   },
 
+  // İlk kullanım kontrolü
+  async getFirstLaunch(): Promise<boolean | null> {
+    try {
+      const value = await AsyncStorage.getItem(STORAGE_KEYS.FIRST_LAUNCH);
+      return value === null ? null : JSON.parse(value);
+    } catch (error) {
+      console.error('İlk kullanım kontrolü hatası:', error);
+      return null;
+    }
+  },
+
+  async setFirstLaunch(value: boolean): Promise<void> {
+    try {
+      await AsyncStorage.setItem(STORAGE_KEYS.FIRST_LAUNCH, JSON.stringify(value));
+    } catch (error) {
+      console.error('İlk kullanım değeri kaydedilirken hata:', error);
+      throw error;
+    }
+  },
+
   // Tüm verileri temizle
   async clearAllData(): Promise<void> {
     try {
       await AsyncStorage.clear();
     } catch (error) {
       console.error('Veriler temizlenirken hata:', error);
+      throw error;
     }
   },
-
-  // Örnek ilaçları yükle
-  async loadSampleMedicines(): Promise<void> {
-    try {
-      const today = new Date();
-      const sampleMedicines: Medicine[] = [];
-      let medicineId = 1;
-
-      // Son 5 günün ilaçlarını oluştur
-      for (let i = 5; i >= 0; i--) {
-        const currentDate = new Date(today);
-        currentDate.setDate(currentDate.getDate() - i);
-        const dateStr = currentDate.toISOString().split('T')[0];
-
-        // Her gün için bir ilaç ekle (dönüşümlü olarak)
-        const templateIndex = i % MEDICINE_TEMPLATES.length;
-        const template = MEDICINE_TEMPLATES[templateIndex];
-        
-        sampleMedicines.push({
-          id: medicineId.toString(),
-          ...template,
-          taken: i > 0, // Bugünün ilaçları hariç hepsi alınmış olsun
-          stockLastUpdated: dateStr,
-          date: dateStr,
-        });
-        medicineId++;
-      }
-
-      await this.saveMedicines(sampleMedicines);
-    } catch (error) {
-      console.error('Örnek ilaçlar yüklenirken hata:', error);
-    }
-  }
 }; 

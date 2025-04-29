@@ -17,8 +17,9 @@ import { useNavigation } from "@react-navigation/native";
 import { StorageService, Relative, Medicine } from "../services/storage";
 import { NotificationService } from "../services/notification";
 import { useMedicine } from "../context/MedicineContext";
-import Sms from "react-native-sms";
-import Geolocation from "react-native-geolocation-service";
+import { formatTime } from "../utils/dateUtils";
+
+console.log("🏠 Ana ekran yükleniyor...");
 
 interface HomeItem {
   id: string;
@@ -32,7 +33,7 @@ interface HomeItem {
     | "weeklyProgress";
 }
 
-export const HomeScreen = () => {
+const HomeScreen = () => {
   const navigation = useNavigation();
   const { medicines, toggleMedicineTaken } = useMedicine();
   const [userName, setUserName] = useState<string>("");
@@ -42,17 +43,23 @@ export const HomeScreen = () => {
     longitude: number;
   } | null>(null);
 
+  console.log("👤 Kullanıcı durumu:", {
+    userName,
+    relativesCount: relatives.length,
+  });
+
   useEffect(() => {
+    console.log("🔄 Başlangıç verileri yükleniyor...");
     loadInitialData();
     loadRelatives();
-    requestLocationPermission();
   }, []);
 
   const loadInitialData = async () => {
     try {
+      console.log("📥 Kullanıcı profili yükleniyor...");
       await Promise.all([loadUserProfile()]);
     } catch (error) {
-      console.error("Veriler yüklenirken hata oluştu:", error);
+      console.error("❌ Veriler yüklenirken hata oluştu:", error);
     }
   };
 
@@ -60,62 +67,23 @@ export const HomeScreen = () => {
     try {
       const profile = await StorageService.getUserProfile();
       if (profile) {
+        console.log("✅ Kullanıcı profili yüklendi:", profile.name);
         setUserName(profile.name);
       }
     } catch (error) {
-      console.error("Profil yüklenirken hata oluştu:", error);
+      console.error("❌ Profil yüklenirken hata oluştu:", error);
     }
   };
 
   const loadRelatives = async () => {
     try {
+      console.log("👥 Yakınlar yükleniyor...");
       const loadedRelatives = await StorageService.getRelatives();
+      console.log("✅ Yakınlar yüklendi, sayı:", loadedRelatives.length);
       setRelatives(loadedRelatives);
     } catch (error) {
-      console.error("Yakınlar yüklenirken hata:", error);
+      console.error("❌ Yakınlar yüklenirken hata:", error);
     }
-  };
-
-  const requestLocationPermission = async () => {
-    if (Platform.OS === "ios") {
-      const auth = await Geolocation.requestAuthorization("whenInUse");
-      if (auth === "granted") {
-        getCurrentLocation();
-      }
-    } else {
-      try {
-        const granted = await PermissionsAndroid.request(
-          PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
-          {
-            title: "Konum İzni",
-            message: "Acil durum mesajı için konum bilginize ihtiyacımız var.",
-            buttonNeutral: "Daha Sonra Sor",
-            buttonNegative: "İptal",
-            buttonPositive: "Tamam",
-          }
-        );
-        if (granted === PermissionsAndroid.RESULTS.GRANTED) {
-          getCurrentLocation();
-        }
-      } catch (err) {
-        console.warn(err);
-      }
-    }
-  };
-
-  const getCurrentLocation = () => {
-    Geolocation.getCurrentPosition(
-      (position) => {
-        setLocation({
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude,
-        });
-      },
-      (error) => {
-        console.error("Konum alınamadı:", error);
-      },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 }
-    );
   };
 
   const getNextMedicine = () => {
@@ -125,16 +93,33 @@ export const HomeScreen = () => {
       .toString()
       .padStart(2, "0")}`;
 
-    return medicines.find(
-      (medicine) => !medicine.taken && medicine.time > currentTime
+    const nextMed = medicines.find(
+      (medicine) =>
+        !medicine.taken &&
+        medicine.usage.time.some((time) => time > currentTime)
     );
+
+    if (nextMed) {
+      const nextTime =
+        nextMed.usage.time.find((time) => time > currentTime) ||
+        nextMed.usage.time[0];
+      return {
+        name: nextMed.name,
+        time: nextTime,
+        dosage: `${nextMed.dosage.amount} ${nextMed.dosage.unit}`,
+      };
+    }
+
+    return null;
   };
 
-  const handleMedicineTaken = async (id: string) => {
-    await toggleMedicineTaken(id);
+  const handleMedicineTaken = async (id: string, time: string) => {
+    console.log("✅ İlaç alındı olarak işaretleniyor:", id);
+    await toggleMedicineTaken(id, time);
   };
 
   const handleEmergency = () => {
+    console.log("🚨 Acil durum butonuna basıldı");
     Alert.alert(
       "Acil Durum",
       "Yakınlarınıza bildirim gönderilecek. Devam etmek istiyor musunuz?",
@@ -142,11 +127,14 @@ export const HomeScreen = () => {
         {
           text: "İptal",
           style: "cancel",
+          onPress: () => console.log("❌ Acil durum iptal edildi"),
         },
         {
           text: "Evet",
           onPress: async () => {
+            console.log("📤 Acil durum bildirimi gönderiliyor...");
             await NotificationService.sendEmergencyNotification();
+            console.log("✅ Acil durum bildirimi gönderildi");
             Alert.alert("Bildirim Gönderildi", "Yakınlarınıza bilgi verildi.");
           },
         },
@@ -155,91 +143,38 @@ export const HomeScreen = () => {
   };
 
   const handleAddMedicine = () => {
+    console.log("➕ Yeni ilaç ekleme ekranına geçiliyor");
     navigation.navigate("AddMedicine" as never);
   };
 
-  const handleReminders = () => {
-    navigation.navigate("Hatirlatmalar" as never);
-  };
-
   const handleCalendar = () => {
+    console.log("📅 Takvim ekranına geçiliyor");
     navigation.navigate("GunlukProgram" as never);
   };
 
   const handleRelatives = () => {
+    console.log("👥 Yakınlar ekranına geçiliyor");
     navigation.navigate("Relatives" as never);
-  };
-
-  const sendEmergencySMS = async () => {
-    if (relatives.length === 0) {
-      Alert.alert(
-        "Uyarı",
-        "Henüz yakın kişi eklenmemiş. Lütfen önce yakın kişi ekleyin."
-      );
-      return;
-    }
-
-    let message =
-      "ACİL DURUM! İlaç Takip Uygulamasından acil durum bildirimi:\n\n";
-
-    if (location) {
-      message += `Konum: https://www.google.com/maps?q=${location.latitude},${location.longitude}\n`;
-      message += `Enlem: ${location.latitude}\n`;
-      message += `Boylam: ${location.longitude}\n\n`;
-    } else {
-      message += "Konum bilgisi alınamadı.\n\n";
-    }
-
-    message += "Lütfen hemen yardıma gelin!";
-
-    const phoneNumbers = relatives
-      .filter((relative) => relative.notifyForEmergency)
-      .map((relative) => relative.phone);
-
-    if (phoneNumbers.length === 0) {
-      Alert.alert(
-        "Uyarı",
-        "Acil durum bildirimi için ayarlanmış yakın kişi bulunamadı."
-      );
-      return;
-    }
-
-    try {
-      Sms.send(
-        {
-          body: message,
-          recipients: phoneNumbers,
-        },
-        (completed, cancelled, error) => {
-          if (completed) {
-            Alert.alert(
-              "Başarılı",
-              "Acil durum mesajı yakınlarınıza gönderildi."
-            );
-          } else if (cancelled) {
-            Alert.alert("İptal", "Mesaj gönderimi iptal edildi.");
-          } else if (error) {
-            Alert.alert("Hata", "Mesaj gönderilirken bir hata oluştu.");
-          }
-        }
-      );
-    } catch (error) {
-      console.error("SMS gönderme hatası:", error);
-      Alert.alert("Hata", "Mesaj gönderilirken bir hata oluştu.");
-    }
   };
 
   const nextMedicine = getNextMedicine();
 
   const MedicineChain = ({ medicines }: { medicines: Medicine[] }) => {
-    // Bugünün tarihini al
+    console.log("⛓️ İlaç zinciri hesaplanıyor...");
     const today = new Date().toISOString().split("T")[0];
 
-    // Sadece bugünün ilaçlarını filtrele
-    const todaysMedicines = medicines.filter((m) => m.date === today);
+    const todaysMedicines = medicines.filter(
+      (m) => m.schedule.startDate === today
+    );
     const takenCount = todaysMedicines.filter((m) => m.taken).length;
     const totalCount = todaysMedicines.length;
     const progress = totalCount > 0 ? (takenCount / totalCount) * 100 : 0;
+
+    console.log("📊 İlaç zinciri durumu:", {
+      toplam: totalCount,
+      alınan: takenCount,
+      ilerleme: progress,
+    });
 
     return (
       <View style={styles.chainContainer}>
@@ -259,35 +194,6 @@ export const HomeScreen = () => {
           <View style={styles.chainBar}>
             <View style={[styles.chainFill, { width: `${progress}%` }]} />
           </View>
-        </View>
-
-        <View style={styles.chainItems}>
-          {todaysMedicines.map((medicine, index) => (
-            <View key={medicine.id} style={styles.chainItem}>
-              <View
-                style={[
-                  styles.chainDot,
-                  medicine.taken
-                    ? styles.chainDotTaken
-                    : styles.chainDotPending,
-                ]}
-              >
-                {medicine.taken && (
-                  <MaterialIcons name="check" size={16} color="white" />
-                )}
-              </View>
-              {index < todaysMedicines.length - 1 && (
-                <View
-                  style={[
-                    styles.chainLine,
-                    medicine.taken
-                      ? styles.chainLineTaken
-                      : styles.chainLinePending,
-                  ]}
-                />
-              )}
-            </View>
-          ))}
         </View>
       </View>
     );
@@ -319,7 +225,7 @@ export const HomeScreen = () => {
           {days.map((day, index) => {
             const dayString = day.toISOString().split("T")[0];
             const dayMedicines = medicines.filter((medicine) => {
-              return medicine.date === dayString;
+              return medicine.schedule.startDate === dayString;
             });
 
             const takenCount = dayMedicines.filter((m) => m.taken).length;
@@ -370,7 +276,7 @@ export const HomeScreen = () => {
         return (
           <TouchableOpacity
             style={styles.emergencyButton}
-            onPress={sendEmergencySMS}
+            onPress={handleEmergency}
           >
             <MaterialIcons name="emergency" size={32} color="white" />
             <Text style={styles.emergencyButtonText}>ACİL DURUM</Text>
@@ -396,59 +302,7 @@ export const HomeScreen = () => {
           </View>
         );
       case "dailyProgram":
-        return (
-          <View style={styles.sectionCard}>
-            <View style={styles.cardHeader}>
-              <MaterialIcons name="today" size={24} color="#2196F3" />
-              <Text style={styles.sectionTitle}>Günlük İlaç Programı</Text>
-            </View>
-            {medicines.length > 0 ? (
-              medicines.map((medicine) => (
-                <TouchableOpacity
-                  key={medicine.id}
-                  style={[
-                    styles.medicineItem,
-                    medicine.taken && styles.medicineTaken,
-                  ]}
-                  onPress={() => handleMedicineTaken(medicine.id)}
-                >
-                  <View style={styles.medicineItemLeft}>
-                    <MaterialIcons
-                      name={
-                        medicine.taken
-                          ? "check-circle"
-                          : "radio-button-unchecked"
-                      }
-                      size={24}
-                      color={medicine.taken ? "#4CAF50" : "#757575"}
-                    />
-                    <View style={styles.medicineItemInfo}>
-                      <Text style={styles.medicineItemName}>
-                        {medicine.name}
-                      </Text>
-                      <Text style={styles.medicineItemDosage}>
-                        {medicine.dosage} • {medicine.type}
-                      </Text>
-                      <Text style={styles.medicineItemUsage}>
-                        {medicine.usageType}
-                        {medicine.timingNote ? ` (${medicine.timingNote})` : ""}
-                      </Text>
-                    </View>
-                  </View>
-                  <Text style={styles.medicineItemTime}>{medicine.time}</Text>
-                </TouchableOpacity>
-              ))
-            ) : (
-              <View style={styles.emptyState}>
-                <MaterialIcons name="info" size={48} color="#757575" />
-                <Text style={styles.emptyStateText}>
-                  Henüz ilaç eklenmemiş. İlaç eklemek için "İlaç Ekle" butonunu
-                  kullanabilirsiniz.
-                </Text>
-              </View>
-            )}
-          </View>
-        );
+        return renderDailyProgram();
       case "quickAccess":
         return (
           <View style={styles.quickAccessGrid}>
@@ -470,6 +324,97 @@ export const HomeScreen = () => {
     }
   };
 
+  const renderDailyProgram = () => {
+    const today = new Date().toISOString().split("T")[0];
+    const todaysMedicines = medicines.filter(
+      (m) => m.schedule.startDate === today
+    );
+
+    return (
+      <View style={styles.sectionCard}>
+        <View style={styles.cardHeader}>
+          <MaterialIcons name="today" size={24} color="#2196F3" />
+          <Text style={styles.sectionTitle}>Günlük İlaç Programı</Text>
+          <View style={styles.progressContainer}>
+            <Text style={styles.progressText}>
+              {todaysMedicines.filter((m) => m.taken).length}/
+              {todaysMedicines.length}
+            </Text>
+            <Text style={styles.progressLabel}>İlaç Alındı</Text>
+          </View>
+        </View>
+
+        {todaysMedicines.length > 0 ? (
+          <View style={styles.medicineList}>
+            {todaysMedicines.map((medicine) => (
+            <TouchableOpacity
+              key={medicine.id}
+              style={[
+                  styles.medicineCard,
+                  medicine.taken && styles.medicineCardTaken,
+              ]}
+                onPress={() =>
+                  handleMedicineTaken(medicine.id, medicine.usage.time[0])
+                }
+            >
+                <View style={styles.medicineCardLeft}>
+                  <View style={styles.medicineIconContainer}>
+                    <MaterialIcons
+                      name={getMedicineIcon(medicine.type)}
+                      size={24}
+                      color={medicine.taken ? "#4CAF50" : "#2196F3"}
+                    />
+                  </View>
+                  <View style={styles.medicineInfo}>
+                    <Text style={styles.medicineName}>{medicine.name}</Text>
+                    <Text style={styles.medicineDetails}>
+                      {medicine.dosage.amount} {medicine.dosage.unit} •{" "}
+                      {medicine.type}
+                    </Text>
+                    <Text style={styles.medicineTime}>
+                      {medicine.usage.time.join(", ")}
+                    </Text>
+                  </View>
+                </View>
+                <View style={styles.medicineStatus}>
+                <MaterialIcons
+                  name={
+                    medicine.taken ? "check-circle" : "radio-button-unchecked"
+                  }
+                  size={24}
+                  color={medicine.taken ? "#4CAF50" : "#757575"}
+                />
+                </View>
+              </TouchableOpacity>
+            ))}
+              </View>
+        ) : (
+          <View style={styles.emptyState}>
+            <MaterialIcons name="info" size={48} color="#757575" />
+            <Text style={styles.emptyStateText}>
+              Bugün için planlanmış ilaç bulunmuyor.
+            </Text>
+          </View>
+        )}
+      </View>
+    );
+  };
+
+  const getMedicineIcon = (type: string) => {
+    switch (type.toLowerCase()) {
+      case "tablet":
+        return "medication";
+      case "şurup":
+        return "local-drink";
+      case "damla":
+        return "water-drop";
+      case "krem":
+        return "spa";
+      default:
+        return "medication";
+    }
+  };
+
   const homeItems: HomeItem[] = [
     { id: "1", type: "welcome" },
     { id: "2", type: "emergency" },
@@ -481,7 +426,8 @@ export const HomeScreen = () => {
   ];
 
   return (
-    <View style={styles.container}>
+    <ScrollView style={styles.container}>
+      <View style={styles.content}>
       <FlatList
         data={homeItems}
         renderItem={renderHomeItem}
@@ -490,6 +436,7 @@ export const HomeScreen = () => {
         showsVerticalScrollIndicator={false}
       />
     </View>
+    </ScrollView>
   );
 };
 
@@ -498,12 +445,15 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#F5F5F5",
   },
+  content: {
+    padding: 8,
+  },
   welcomeCard: {
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: "#2196F3",
     padding: 20,
-    margin: 16,
+    margin: 8,
     borderRadius: 16,
     elevation: 4,
     shadowColor: "#000",
@@ -594,8 +544,8 @@ const styles = StyleSheet.create({
   },
   sectionCard: {
     backgroundColor: "white",
-    padding: 20,
-    margin: 16,
+    padding: 16,
+    margin: 8,
     borderRadius: 16,
     elevation: 4,
     shadowColor: "#000",
@@ -608,49 +558,77 @@ const styles = StyleSheet.create({
     color: "#2196F3",
     fontWeight: "bold",
     marginLeft: 8,
+    flex: 1,
   },
-  medicineItem: {
+  progressContainer: {
+    alignItems: "center",
+    marginLeft: 16,
+  },
+  progressText: {
+    fontSize: 24,
+    color: "#2196F3",
+    fontWeight: "bold",
+  },
+  progressLabel: {
+    fontSize: 12,
+    color: "#757575",
+  },
+  medicineList: {
+    gap: 12,
+  },
+  medicineCard: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    padding: 12,
     backgroundColor: "#F5F5F5",
-    borderRadius: 8,
-    marginTop: 8,
+    padding: 16,
+    borderRadius: 12,
+    borderLeftWidth: 4,
+    borderLeftColor: "#2196F3",
+    marginHorizontal: 4,
   },
-  medicineTaken: {
+  medicineCardTaken: {
     backgroundColor: "#E8F5E9",
+    borderLeftColor: "#4CAF50",
   },
-  medicineItemLeft: {
+  medicineCardLeft: {
     flexDirection: "row",
     alignItems: "center",
     flex: 1,
   },
-  medicineItemInfo: {
-    marginLeft: 12,
+  medicineIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: "rgba(33, 150, 243, 0.1)",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 12,
   },
-  medicineItemName: {
+  medicineInfo: {
+    flex: 1,
+  },
+  medicineName: {
     fontSize: 18,
     color: "#212121",
     fontWeight: "500",
+    marginBottom: 4,
   },
-  medicineItemDosage: {
-    fontSize: 16,
+  medicineDetails: {
+    fontSize: 14,
     color: "#757575",
-    marginTop: 2,
+    marginBottom: 2,
   },
-  medicineItemTime: {
-    fontSize: 18,
+  medicineTime: {
+    fontSize: 14,
     color: "#2196F3",
     fontWeight: "500",
   },
-  medicineItemUsage: {
-    fontSize: 14,
-    color: "#2196F3",
-    marginTop: 2,
+  medicineStatus: {
+    marginLeft: 12,
   },
   quickAccessGrid: {
-    padding: 16,
+    padding: 8,
   },
   addMedicineButton: {
     width: "100%",
@@ -683,8 +661,8 @@ const styles = StyleSheet.create({
   },
   chainContainer: {
     backgroundColor: "white",
-    padding: 20,
-    margin: 16,
+    padding: 16,
+    margin: 8,
     borderRadius: 16,
     elevation: 4,
     shadowColor: "#000",
@@ -731,47 +709,10 @@ const styles = StyleSheet.create({
     height: "100%",
     backgroundColor: "#4CAF50",
   },
-  chainItems: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 20,
-  },
-  chainItem: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  chainDot: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 2,
-  },
-  chainDotTaken: {
-    backgroundColor: "#4CAF50",
-    borderColor: "#4CAF50",
-  },
-  chainDotPending: {
-    backgroundColor: "white",
-    borderColor: "#E0E0E0",
-  },
-  chainLine: {
-    width: 40,
-    height: 2,
-    marginHorizontal: 4,
-  },
-  chainLineTaken: {
-    backgroundColor: "#4CAF50",
-  },
-  chainLinePending: {
-    backgroundColor: "#E0E0E0",
-  },
   weeklyContainer: {
     backgroundColor: "white",
-    padding: 20,
-    margin: 16,
+    padding: 16,
+    margin: 8,
     borderRadius: 16,
     elevation: 4,
     shadowColor: "#000",
@@ -824,6 +765,8 @@ const styles = StyleSheet.create({
     fontWeight: "500",
   },
   listContainer: {
-    padding: 16,
+    padding: 8,
   },
 });
+
+export default HomeScreen;

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useCallback } from "react";
 import {
   View,
   Text,
@@ -15,6 +15,9 @@ import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useMedicine } from "../context/MedicineContext";
 import { Medicine } from "../types/medicine";
+import EditMedicineModal from "../components/EditMedicineModal";
+
+console.log("💊 İlaçlar ekranı yükleniyor...");
 
 type RootStackParamList = {
   MainTabs: undefined;
@@ -24,149 +27,176 @@ type RootStackParamList = {
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
-export const MedicinesScreen = () => {
+const MedicinesScreen = () => {
   const navigation = useNavigation<NavigationProp>();
-  const { medicines, updateMedicine, toggleMedicineTaken } = useMedicine();
+  const {
+    medicines,
+    updateMedicine,
+    toggleMedicineTaken,
+    refreshMedicines,
+    deleteMedicine,
+  } = useMedicine();
   const [selectedMedicine, setSelectedMedicine] = useState<Medicine | null>(
     null
   );
-  const [isStockModalVisible, setIsStockModalVisible] = useState(false);
-  const [stockAmount, setStockAmount] = useState("");
+  const [isEditModalVisible, setIsEditModalVisible] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [isModalVisible, setIsModalVisible] = useState(false);
+
+  console.log("📊 İlaç listesi durumu:", {
+    toplamİlaç: medicines.length,
+    seçiliİlaç: selectedMedicine?.name,
+  });
+
+  const onRefresh = useCallback(async () => {
+    console.log("🔄 İlaç listesi yenileniyor...");
+    setRefreshing(true);
+    try {
+      await refreshMedicines();
+      console.log("✅ İlaç listesi başarıyla yenilendi");
+    } catch (error) {
+      console.error("❌ İlaçlar yenilenirken hata:", error);
+      Alert.alert("Hata", "İlaçlar yenilenirken bir hata oluştu.");
+    } finally {
+      setRefreshing(false);
+      console.log("🏁 Yenileme işlemi tamamlandı");
+    }
+  }, [refreshMedicines]);
 
   const handleAddMedicine = () => {
+    console.log("➕ Yeni ilaç ekleme ekranına geçiliyor");
     navigation.navigate("AddMedicine");
   };
 
   const handleEditMedicine = (medicine: Medicine) => {
+    console.log("✏️ İlaç düzenleme ekranına geçiliyor:", medicine.name);
     navigation.navigate("EditMedicine", { medicine });
   };
 
-  const handleUpdateStock = (medicine: Medicine) => {
+  const handleToggleTaken = async (medicine: Medicine) => {
+    console.log("🔄 İlaç durumu değiştiriliyor:", medicine.name);
+    try {
+      const updatedMedicine = {
+        ...medicine,
+        taken: !medicine.taken,
+        lastTaken: medicine.taken ? undefined : new Date().toISOString(),
+      };
+      console.log("📝 Yeni ilaç durumu:", {
+        isim: updatedMedicine.name,
+        alındı: updatedMedicine.taken,
+        sonAlım: updatedMedicine.lastTaken,
+      });
+      await updateMedicine(updatedMedicine);
+      console.log("✅ İlaç durumu güncellendi");
+    } catch (error) {
+      console.error("❌ İlaç durumu güncellenirken hata:", error);
+      Alert.alert("Hata", "İlaç durumu güncellenirken bir hata oluştu.");
+    }
+  };
+
+  const handleMedicinePress = (medicine: Medicine) => {
     setSelectedMedicine(medicine);
-    setStockAmount(medicine.stockAmount.toString());
-    setIsStockModalVisible(true);
+    setIsModalVisible(true);
   };
 
-  const handleSaveStock = async () => {
-    if (!selectedMedicine) return;
-
-    const amount = parseInt(stockAmount);
-    if (isNaN(amount) || amount < 0) {
-      Alert.alert("Hata", "Lütfen geçerli bir miktar girin.");
-      return;
+  const handleUpdateMedicine = async (updatedMedicine: Medicine) => {
+    try {
+      await updateMedicine(updatedMedicine);
+      setIsModalVisible(false);
+      setSelectedMedicine(null);
+    } catch (error) {
+      Alert.alert("Hata", "İlaç güncellenirken bir hata oluştu.");
     }
-
-    const updatedMedicine = {
-      ...selectedMedicine,
-      stockAmount: amount,
-      stockLastUpdated: new Date().toISOString().split("T")[0],
-    };
-
-    await updateMedicine(updatedMedicine);
-    setIsStockModalVisible(false);
-    setSelectedMedicine(null);
   };
 
-  const getStockStatus = (medicine: Medicine) => {
-    if (medicine.stockAmount <= 0) {
-      return {
-        color: "#F44336",
-        text: "Stok Tükendi",
-        icon: "error",
-      };
-    } else if (medicine.stockAmount <= medicine.stockThreshold) {
-      return {
-        color: "#FF9800",
-        text: "Stok Azalıyor",
-        icon: "warning",
-      };
+  const handleDeleteMedicine = async (id: string) => {
+    try {
+      await deleteMedicine(id);
+      setIsModalVisible(false);
+      setSelectedMedicine(null);
+    } catch (error) {
+      Alert.alert("Hata", "İlaç silinirken bir hata oluştu.");
     }
-    return {
-      color: "#4CAF50",
-      text: "Stok Yeterli",
-      icon: "check-circle",
-    };
   };
 
-  const renderMedicineItem = ({ item }: { item: Medicine }) => (
-    <View style={styles.medicineCard}>
-      <View style={styles.medicineHeader}>
-        <View style={styles.medicineInfo}>
-          <MaterialIcons name="medication" size={20} color="#2196F3" />
-          <Text style={styles.medicineName}>{item.name}</Text>
+  const MedicineItem = ({ medicine, onPress }: MedicineItemProps) => {
+    return (
+      <TouchableOpacity
+        style={styles.medicineCard}
+        onPress={() => onPress(medicine)}
+      >
+        <View style={styles.medicineCardLeft}>
+          <View style={styles.medicineIconContainer}>
+            <MaterialIcons
+              name={getMedicineIcon(medicine.type)}
+              size={28}
+              color="#2196F3"
+            />
+          </View>
+          <View style={styles.medicineInfo}>
+            <Text style={styles.medicineName}>{medicine.name}</Text>
+            <View style={styles.medicineDetails}>
+              <Text style={styles.medicineDosage}>
+                {medicine.dosage.amount} {medicine.dosage.unit}
+              </Text>
+              <View style={styles.medicineTypeContainer}>
+                <Text style={styles.medicineType}>{medicine.type}</Text>
+              </View>
+            </View>
+            <View style={styles.medicineSchedule}>
+              <MaterialIcons name="schedule" size={16} color="#757575" />
+              <Text style={styles.medicineTime}>
+                {medicine.usage.time.join(", ")}
+              </Text>
+            </View>
+            <Text style={styles.medicineFrequency}>
+              {medicine.usage.frequency}
+              {medicine.usage.condition ? ` (${medicine.usage.condition})` : ""}
+            </Text>
+          </View>
         </View>
-        <TouchableOpacity
-          onPress={() =>
-            navigation.navigate("EditMedicine", { medicine: item })
-          }
-        >
-          <MaterialIcons name="edit" size={20} color="#757575" />
-        </TouchableOpacity>
-      </View>
+        <MaterialIcons
+          name="chevron-right"
+          size={24}
+          color="#757575"
+          style={styles.chevronIcon}
+        />
+      </TouchableOpacity>
+    );
+  };
 
-      <View style={styles.medicineDetails}>
-        <View style={styles.detailRow}>
-          <View style={styles.detailItem}>
-            <MaterialIcons name="access-time" size={16} color="#757575" />
-            <Text style={styles.detailText}>{item.time}</Text>
-          </View>
-          <View style={styles.detailItem}>
-            <MaterialIcons name="straighten" size={16} color="#757575" />
-            <Text style={styles.detailText}>{item.dosage}</Text>
-          </View>
-          <View style={styles.detailItem}>
-            <MaterialIcons name="category" size={16} color="#757575" />
-            <Text style={styles.detailText}>{item.type}</Text>
-          </View>
-        </View>
-        <View style={styles.detailRow}>
-          <View style={styles.detailItem}>
-            <MaterialIcons name="event-note" size={16} color="#757575" />
-            <Text style={styles.detailText}>{item.usageType}</Text>
-          </View>
-        </View>
-      </View>
+  const getMedicineIcon = (type: string) => {
+    switch (type.toLowerCase()) {
+      case "tablet":
+        return "medication";
+      case "şurup":
+        return "local-drink";
+      case "damla":
+        return "water-drop";
+      case "krem":
+        return "spa";
+      default:
+        return "medication";
+    }
+  };
 
-      <View style={styles.stockInfo}>
-        <View
-          style={[
-            styles.stockStatus,
-            item.stockAmount > item.stockThreshold
-              ? styles.stockOk
-              : styles.stockLow,
-          ]}
-        >
-          <MaterialIcons
-            name={
-              item.stockAmount > item.stockThreshold
-                ? "check-circle"
-                : "warning"
-            }
-            size={16}
-            color={
-              item.stockAmount > item.stockThreshold ? "#4CAF50" : "#FF9800"
-            }
-          />
-          <Text
-            style={[
-              styles.stockText,
-              item.stockAmount > item.stockThreshold
-                ? styles.stockTextOk
-                : styles.stockTextLow,
-            ]}
-          >
-            Stok {item.stockAmount > item.stockThreshold ? "Yeterli" : "Az"}
-          </Text>
-        </View>
-      </View>
-    </View>
-  );
+  console.log("🎯 İlaç listesi render ediliyor...");
 
   return (
     <View style={styles.container}>
+      <View style={styles.header}>
+        <Text style={styles.title}>İlaçlarım</Text>
+        <Text style={styles.subtitle}>Kayıtlı tüm ilaçlarınız</Text>
+      </View>
+
       <FlatList
         data={medicines}
-        renderItem={renderMedicineItem}
+        renderItem={({ item }) => (
+          <MedicineItem
+            medicine={item}
+            onPress={(medicine) => handleMedicinePress(medicine)}
+          />
+        )}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContainer}
         ListEmptyComponent={
@@ -178,47 +208,25 @@ export const MedicinesScreen = () => {
             </Text>
           </View>
         }
+        refreshing={refreshing}
+        onRefresh={onRefresh}
       />
       <TouchableOpacity style={styles.addButton} onPress={handleAddMedicine}>
         <MaterialIcons name="add" size={32} color="white" />
       </TouchableOpacity>
 
-      <Modal
-        visible={isStockModalVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setIsStockModalVisible(false)}
-      >
-        <View style={styles.modalContainer}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Stok Güncelle</Text>
-            <Text style={styles.modalSubtitle}>
-              {selectedMedicine?.name} - {selectedMedicine?.stockUnit}
-            </Text>
-            <TextInput
-              style={styles.stockInput}
-              keyboardType="numeric"
-              value={stockAmount}
-              onChangeText={setStockAmount}
-              placeholder={`Mevcut ${selectedMedicine?.stockUnit} miktarı`}
-            />
-            <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.cancelButton]}
-                onPress={() => setIsStockModalVisible(false)}
-              >
-                <Text style={styles.cancelButtonText}>İptal</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.saveButton]}
-                onPress={handleSaveStock}
-              >
-                <Text style={styles.saveButtonText}>Kaydet</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
+      {selectedMedicine && (
+        <EditMedicineModal
+          visible={isModalVisible}
+          medicine={selectedMedicine}
+          onClose={() => {
+            setIsModalVisible(false);
+            setSelectedMedicine(null);
+          }}
+          onUpdate={handleUpdateMedicine}
+          onDelete={handleDeleteMedicine}
+        />
+      )}
     </View>
   );
 };
@@ -228,82 +236,101 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#F5F5F5",
   },
+  header: {
+    padding: 16,
+    backgroundColor: "white",
+    borderBottomWidth: 1,
+    borderBottomColor: "#E0E0E0",
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: "bold",
+    color: "#212121",
+    marginBottom: 4,
+  },
+  subtitle: {
+    fontSize: 16,
+    color: "#757575",
+  },
   listContainer: {
     padding: 16,
-    gap: 12,
   },
   medicineCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     backgroundColor: "white",
+    padding: 16,
+    marginHorizontal: 8,
+    marginVertical: 6,
     borderRadius: 12,
-    padding: 12,
     elevation: 2,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
+    shadowOpacity: 0.1,
     shadowRadius: 2,
   },
-  medicineHeader: {
+  medicineCardLeft: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 8,
+    flex: 1,
+  },
+  medicineIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: "rgba(33, 150, 243, 0.1)",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 12,
   },
   medicineInfo: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
+    flex: 1,
   },
   medicineName: {
-    fontSize: 16,
-    fontWeight: "600",
+    fontSize: 18,
     color: "#212121",
+    fontWeight: "500",
+    marginBottom: 4,
   },
   medicineDetails: {
-    gap: 4,
-  },
-  detailRow: {
-    flexDirection: "row",
-    gap: 16,
-  },
-  detailItem: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 4,
+    marginBottom: 4,
   },
-  detailText: {
+  medicineDosage: {
     fontSize: 14,
     color: "#757575",
+    marginRight: 8,
   },
-  stockInfo: {
-    marginTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: "#F5F5F5",
-    paddingTop: 8,
-  },
-  stockStatus: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
+  medicineTypeContainer: {
+    backgroundColor: "rgba(33, 150, 243, 0.1)",
     paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-    alignSelf: "flex-start",
+    paddingVertical: 2,
+    borderRadius: 4,
   },
-  stockOk: {
-    backgroundColor: "#E8F5E9",
-  },
-  stockLow: {
-    backgroundColor: "#FFF3E0",
-  },
-  stockText: {
+  medicineType: {
     fontSize: 12,
+    color: "#2196F3",
     fontWeight: "500",
   },
-  stockTextOk: {
-    color: "#4CAF50",
+  medicineSchedule: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 2,
   },
-  stockTextLow: {
-    color: "#FF9800",
+  medicineTime: {
+    fontSize: 14,
+    color: "#757575",
+    marginLeft: 4,
+  },
+  medicineFrequency: {
+    fontSize: 12,
+    color: "#2196F3",
+    fontWeight: "500",
+  },
+  chevronIcon: {
+    marginLeft: 8,
   },
   addButton: {
     position: "absolute",
@@ -316,74 +343,22 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     elevation: 4,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
   },
   emptyState: {
     alignItems: "center",
-    padding: 24,
+    justifyContent: "center",
+    padding: 32,
   },
   emptyStateText: {
     fontSize: 16,
     color: "#757575",
     textAlign: "center",
-    marginTop: 12,
-    marginHorizontal: 32,
-  },
-  modalContainer: {
-    flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  modalContent: {
-    backgroundColor: "white",
-    borderRadius: 12,
-    padding: 24,
-    width: "80%",
-    maxWidth: 400,
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: "500",
-    color: "#212121",
-    marginBottom: 8,
-  },
-  modalSubtitle: {
-    fontSize: 16,
-    color: "#757575",
-    marginBottom: 16,
-  },
-  stockInput: {
-    borderWidth: 1,
-    borderColor: "#E0E0E0",
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    marginBottom: 16,
-  },
-  modalButtons: {
-    flexDirection: "row",
-    justifyContent: "flex-end",
-  },
-  modalButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    marginLeft: 8,
-  },
-  cancelButton: {
-    backgroundColor: "#F5F5F5",
-  },
-  cancelButtonText: {
-    color: "#757575",
-    fontSize: 16,
-    fontWeight: "500",
-  },
-  saveButton: {
-    backgroundColor: "#2196F3",
-  },
-  saveButtonText: {
-    color: "white",
-    fontSize: 16,
-    fontWeight: "500",
+    marginTop: 16,
   },
 });
+
+export default MedicinesScreen;

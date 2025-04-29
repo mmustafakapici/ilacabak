@@ -1,186 +1,190 @@
 import React, { useState, useEffect } from "react";
 import { NavigationContainer } from "@react-navigation/native";
+import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
-import { createStackNavigator } from "@react-navigation/stack";
+import { SafeAreaView, Platform, StatusBar, View, Text } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
-import { HomeScreen } from "./src/screens/HomeScreen";
-import { MedicinesScreen } from "./src/screens/MedicinesScreen";
-import { DailyMedicineScreen } from "./src/screens/CalendarScreen";
-import { RemindersScreen } from "./src/screens/RemindersScreen";
-import { ProfileScreen } from "./src/screens/ProfileScreen";
-import { WelcomeScreen } from "./src/screens/WelcomeScreen";
-import { AddMedicineScreen } from "./src/screens/AddMedicineScreen";
-import { EditMedicineScreen } from "./src/screens/EditMedicineScreen";
+import { ThemeProvider } from "./src/context/ThemeContext";
+import { MedicineProvider } from "./src/context/MedicineContext";
+import WelcomeScreen from "./src/screens/WelcomeScreen";
+import HomeScreen from "./src/screens/HomeScreen";
+import AddMedicineScreen from "./src/screens/AddMedicineScreen";
+import EditMedicineScreen from "./src/screens/EditMedicineScreen";
+import MedicinesScreen from "./src/screens/MedicinesScreen";
+import CalendarScreen from "./src/screens/CalendarScreen";
+import ProfileScreen from "./src/screens/ProfileScreen";
 import { StorageService } from "./src/services/storage";
-import { View, Text, StyleSheet } from "react-native";
-import { MedicineProvider, useMedicine } from "./src/context/MedicineContext";
+import { useTheme } from "./src/context/ThemeContext";
+import DailyMedicineScreen from "./src/screens/DailyMedicineScreen";
 
+console.log("🚀 Uygulama başlatılıyor...");
+
+export type RootStackParamList = {
+  Welcome: undefined;
+  HomeScreen: undefined;
+  AddMedicineScreen: undefined;
+  EditMedicineScreen: { medicineId: string };
+  MedicinesScreen: undefined;
+  CalendarScreen: undefined;
+  ProfileScreen: undefined;
+};
+
+const Stack = createNativeStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator();
-const Stack = createStackNavigator();
+const Container = Platform.OS === "ios" ? SafeAreaView : View;
+
+console.log("📱 Platform:", Platform.OS);
 
 const TabNavigator = () => {
-  const { reminderCount } = useMedicine();
+  const { theme } = useTheme();
+  console.log("🎨 Tema yükleniyor:", theme);
 
   return (
     <Tab.Navigator
       screenOptions={{
-        tabBarActiveTintColor: "#2196F3",
-        tabBarInactiveTintColor: "#757575",
+        headerShown: false,
         tabBarStyle: {
-          paddingBottom: 5,
-          paddingTop: 5,
+          backgroundColor: theme.colors.surface,
+          borderTopWidth: 1,
+          borderTopColor: theme.colors.border,
+          height: 60,
+          paddingBottom: 8,
+          paddingTop: 8,
         },
-        tabBarLabelStyle: {
-          fontSize: 12,
-          fontWeight: "500",
-        },
+        tabBarActiveTintColor: theme.colors.primary,
+        tabBarInactiveTintColor: theme.colors.textSecondary,
       }}
     >
       <Tab.Screen
-        name="Ana Sayfa"
+        name="HomeScreen"
         component={HomeScreen}
         options={{
           tabBarIcon: ({ color, size }) => (
             <MaterialIcons name="home" size={size} color={color} />
           ),
+          tabBarLabel: "Ana Sayfa",
         }}
       />
       <Tab.Screen
-        name="İlaçlarım"
+        name="MedicinesScreen"
         component={MedicinesScreen}
         options={{
           tabBarIcon: ({ color, size }) => (
             <MaterialIcons name="medication" size={size} color={color} />
           ),
+          tabBarLabel: "İlaçlarım",
         }}
       />
       <Tab.Screen
-        name="Günlük Program"
+        name="DailyMedicineScreen"
         component={DailyMedicineScreen}
+        options={{
+          tabBarIcon: ({ color, size }) => (
+            <MaterialIcons name="schedule" size={size} color={color} />
+          ),
+          tabBarLabel: "Günlük Dozlar",
+        }}
+      />
+      <Tab.Screen
+        name="CalendarScreen"
+        component={CalendarScreen}
         options={{
           tabBarIcon: ({ color, size }) => (
             <MaterialIcons name="calendar-today" size={size} color={color} />
           ),
+          tabBarLabel: "Takvim",
         }}
       />
       <Tab.Screen
-        name="Hatırlatmalar"
-        component={RemindersScreen}
-        options={{
-          tabBarIcon: ({ color, size }) => (
-            <View style={tabStyles.iconContainer}>
-              <MaterialIcons name="notifications" size={size} color={color} />
-              {reminderCount > 0 && (
-                <View style={tabStyles.badge}>
-                  <Text style={tabStyles.badgeText}>{reminderCount}</Text>
-                </View>
-              )}
-            </View>
-          ),
-        }}
-      />
-      <Tab.Screen
-        name="Profil"
+        name="ProfileScreen"
         component={ProfileScreen}
         options={{
           tabBarIcon: ({ color, size }) => (
             <MaterialIcons name="person" size={size} color={color} />
           ),
+          tabBarLabel: "Profil",
         }}
       />
     </Tab.Navigator>
   );
 };
 
-const tabStyles = StyleSheet.create({
-  iconContainer: {
-    width: 24,
-    height: 24,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  badge: {
-    position: "absolute",
-    right: -8,
-    top: -5,
-    backgroundColor: "#F44336",
-    borderRadius: 10,
-    minWidth: 18,
-    height: 18,
-    justifyContent: "center",
-    alignItems: "center",
-    paddingHorizontal: 4,
-  },
-  badgeText: {
-    color: "white",
-    fontSize: 12,
-    fontWeight: "bold",
-  },
-});
+const App = () => {
+  const [isFirstLaunch, setIsFirstLaunch] = useState<boolean | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-const AppNavigator = () => {
-  return (
-    <Stack.Navigator>
-      <Stack.Screen
-        name="MainTabs"
-        component={TabNavigator}
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen
-        name="AddMedicine"
-        component={AddMedicineScreen}
-        options={{
-          title: "Yeni İlaç Ekle",
-          headerTitleStyle: {
-            fontSize: 20,
-            fontWeight: "500",
-          },
-        }}
-      />
-      <Stack.Screen
-        name="EditMedicine"
-        component={EditMedicineScreen}
-        options={{
-          title: "İlacı Düzenle",
-          headerTitleStyle: {
-            fontSize: 20,
-            fontWeight: "500",
-          },
-        }}
-      />
-    </Stack.Navigator>
-  );
-};
-
-export default function App() {
-  const [isFirstLaunch, setIsFirstLaunch] = useState(true);
+  console.log("📱 Uygulama durumu:", isFirstLaunch);
 
   useEffect(() => {
+    console.log("🔄 İlk kullanım kontrolü başlatılıyor...");
+    const checkFirstLaunch = async () => {
+      try {
+        const firstLaunch = await StorageService.getFirstLaunch();
+        console.log("✅ İlk kullanım durumu:", firstLaunch);
+        setIsFirstLaunch(firstLaunch === null ? true : firstLaunch);
+        setIsLoading(false);
+      } catch (error) {
+        console.error("❌ İlk kullanım kontrolü sırasında hata:", error);
+        setError(
+          "Uygulama başlatılırken bir hata oluştu. Lütfen tekrar deneyin."
+        );
+        setIsFirstLaunch(true);
+        setIsLoading(false);
+      }
+    };
+
     checkFirstLaunch();
   }, []);
 
-  const checkFirstLaunch = async () => {
-    try {
-      const profile = await StorageService.getUserProfile();
-      setIsFirstLaunch(!profile);
-    } catch (error) {
-      console.error("İlk açılış kontrolünde hata:", error);
-    }
-  };
-
-  const handleWelcomeComplete = () => {
-    setIsFirstLaunch(false);
-  };
-
-  if (isFirstLaunch) {
-    return <WelcomeScreen onComplete={handleWelcomeComplete} />;
+  if (isLoading) {
+    console.log("⏳ Uygulama yükleniyor...");
+    return (
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+        <Text>Yükleniyor...</Text>
+      </View>
+    );
   }
 
+  if (error) {
+    return (
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+        <Text style={{ color: "red", textAlign: "center", padding: 20 }}>
+          {error}
+        </Text>
+      </View>
+    );
+  }
+
+  console.log("🎯 Uygulama başlatıldı, navigasyon hazırlanıyor...");
+
   return (
-    <NavigationContainer>
+    <ThemeProvider>
       <MedicineProvider>
-        <AppNavigator />
+        <Container style={{ flex: 1 }}>
+          <StatusBar backgroundColor="#F5F5F5" barStyle="dark-content" />
+          <NavigationContainer>
+            <Stack.Navigator
+              screenOptions={{
+                headerShown: false,
+                animation: "slide_from_right",
+              }}
+            >
+              {isFirstLaunch ? (
+                <Stack.Screen name="Welcome" component={WelcomeScreen} />
+              ) : null}
+              <Stack.Screen name="MainTabs" component={TabNavigator} />
+              <Stack.Screen name="AddMedicine" component={AddMedicineScreen} />
+              <Stack.Screen
+                name="EditMedicine"
+                component={EditMedicineScreen}
+              />
+            </Stack.Navigator>
+          </NavigationContainer>
+        </Container>
       </MedicineProvider>
-    </NavigationContainer>
+    </ThemeProvider>
   );
-}
+};
+
+export default App;

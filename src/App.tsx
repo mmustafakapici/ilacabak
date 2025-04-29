@@ -8,6 +8,8 @@ import { AddMedicineScreen } from "./screens/AddMedicineScreen";
 import { ProfileScreen } from "./screens/ProfileScreen";
 import { NotificationSettingsScreen } from "./screens/NotificationSettingsScreen";
 import { MedicineProvider } from "./context/MedicineContext";
+import { ThemeProvider } from "./context/ThemeContext";
+import BottomTabNavigator from "./navigation/BottomTabNavigator";
 
 const Stack = createNativeStackNavigator();
 
@@ -26,48 +28,12 @@ export default function App() {
   };
 
   return (
+    <ThemeProvider>
     <MedicineProvider>
       <NavigationContainer>
-        <Stack.Navigator
-          initialRouteName="Welcome"
-          screenOptions={{
-            headerStyle: {
-              backgroundColor: "#2196F3",
-            },
-            headerTintColor: "#fff",
-            headerTitleStyle: {
-              fontWeight: "bold",
-              fontSize: 24,
-            },
-          }}
-        >
-          <Stack.Screen
-            name="Welcome"
-            component={WelcomeScreen}
-            options={{ headerShown: false }}
-          />
-          <Stack.Screen
-            name="Home"
-            component={HomeScreen}
-            options={{ title: "Ana Sayfa" }}
-          />
-          <Stack.Screen
-            name="AddMedicine"
-            component={AddMedicineScreen}
-            options={{ title: "İlaç Ekle" }}
-          />
-          <Stack.Screen
-            name="Profile"
-            component={ProfileScreen}
-            options={{ title: "Profil" }}
-          />
-          <Stack.Screen
-            name="NotificationSettings"
-            component={NotificationSettingsScreen}
-            options={{ title: "Bildirim Ayarları" }}
-          />
-        </Stack.Navigator>
+          <BottomTabNavigator />
       </NavigationContainer>
     </MedicineProvider>
+    </ThemeProvider>
   );
 }
